@@ -1,0 +1,583 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import StepIndicator from '@/components/StepIndicator';
+import Disclaimer from '@/components/Disclaimer';
+import type { EligibilityInput } from '@/types';
+
+const REGIONS = [
+  '서울특별시',
+  '부산광역시',
+  '대구광역시',
+  '인천광역시',
+  '광주광역시',
+  '대전광역시',
+  '울산광역시',
+  '세종특별자치시',
+  '경기도',
+  '강원특별자치도',
+  '충청북도',
+  '충청남도',
+  '전북특별자치도',
+  '전라남도',
+  '경상북도',
+  '경상남도',
+  '제주특별자치도',
+];
+
+const STEP_LABELS = ['무주택', '부양가족', '청약통장', '거주지역', '혼인/자녀'];
+
+const TOTAL_STEPS = 5;
+
+const defaultInput: EligibilityInput = {
+  isHomeless: true,
+  homelessYears: 0,
+  dependentsCount: 0,
+  subscriptionStartDate: '',
+  subscriptionPaymentCount: 0,
+  subscriptionBalance: 0,
+  region: '',
+  isMarried: false,
+  hasRecentChild: false,
+};
+
+export default function CalculatorPage() {
+  const router = useRouter();
+  const [step, setStep] = useState(1);
+  const [input, setInput] = useState<EligibilityInput>(defaultInput);
+
+  const updateInput = <K extends keyof EligibilityInput>(
+    key: K,
+    value: EligibilityInput[K],
+  ) => {
+    setInput((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleNext = () => {
+    if (step < TOTAL_STEPS) {
+      setStep((s) => s + 1);
+    } else {
+      // 결과 페이지로 이동 (쿼리스트링으로 데이터 전달)
+      const params = new URLSearchParams({
+        data: JSON.stringify(input),
+      });
+      router.push(`/result?${params.toString()}`);
+    }
+  };
+
+  const handleBack = () => {
+    if (step > 1) setStep((s) => s - 1);
+  };
+
+  return (
+    <main className="min-h-screen bg-gray-50">
+      <div className="max-w-md mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="mb-6">
+          <button
+            onClick={() => router.push('/')}
+            className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm mb-4"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
+            </svg>
+            홈으로
+          </button>
+          <h1 className="text-2xl font-bold text-gray-900">청약 가점 계산</h1>
+          <p className="text-gray-500 text-sm mt-1">
+            정확한 정보를 입력하면 더 정밀한 결과를 제공합니다.
+          </p>
+        </div>
+
+        <StepIndicator
+          currentStep={step}
+          totalSteps={TOTAL_STEPS}
+          stepLabels={STEP_LABELS}
+        />
+
+        {/* Step Content */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-4">
+          {step === 1 && (
+            <Step1
+              isHomeless={input.isHomeless}
+              homelessYears={input.homelessYears}
+              onChange={updateInput}
+            />
+          )}
+          {step === 2 && (
+            <Step2
+              dependentsCount={input.dependentsCount}
+              onChange={updateInput}
+            />
+          )}
+          {step === 3 && (
+            <Step3
+              subscriptionStartDate={input.subscriptionStartDate}
+              subscriptionPaymentCount={input.subscriptionPaymentCount}
+              subscriptionBalance={input.subscriptionBalance}
+              onChange={updateInput}
+            />
+          )}
+          {step === 4 && (
+            <Step4 region={input.region} onChange={updateInput} />
+          )}
+          {step === 5 && (
+            <Step5
+              isMarried={input.isMarried}
+              hasRecentChild={input.hasRecentChild}
+              onChange={updateInput}
+            />
+          )}
+        </div>
+
+        {/* Navigation */}
+        <div className="flex gap-3">
+          {step > 1 && (
+            <button
+              onClick={handleBack}
+              className="flex-1 py-3.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold rounded-xl transition-colors"
+            >
+              이전
+            </button>
+          )}
+          <button
+            onClick={handleNext}
+            className="flex-1 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors shadow-md"
+          >
+            {step === TOTAL_STEPS ? '결과 보기' : '다음'}
+          </button>
+        </div>
+
+        <Disclaimer />
+      </div>
+    </main>
+  );
+}
+
+// Step 1: 무주택 여부 및 기간
+function Step1({
+  isHomeless,
+  homelessYears,
+  onChange,
+}: {
+  isHomeless: boolean;
+  homelessYears: number;
+  onChange: <K extends keyof EligibilityInput>(
+    key: K,
+    value: EligibilityInput[K],
+  ) => void;
+}) {
+  return (
+    <div>
+      <h2 className="text-lg font-bold text-gray-900 mb-1">무주택 여부</h2>
+      <p className="text-gray-500 text-sm mb-5">
+        현재 주택을 소유하고 있지 않으신가요?
+      </p>
+
+      <div className="space-y-3 mb-6">
+        <button
+          onClick={() => onChange('isHomeless', true)}
+          className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
+            isHomeless
+              ? 'border-blue-600 bg-blue-50'
+              : 'border-gray-200 bg-white'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                isHomeless ? 'border-blue-600' : 'border-gray-300'
+              }`}
+            >
+              {isHomeless && (
+                <div className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+              )}
+            </div>
+            <div>
+              <p className="font-semibold text-gray-800">무주택자입니다</p>
+              <p className="text-gray-500 text-xs">
+                현재 소유한 주택이 없습니다
+              </p>
+            </div>
+          </div>
+        </button>
+
+        <button
+          onClick={() => onChange('isHomeless', false)}
+          className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
+            !isHomeless
+              ? 'border-blue-600 bg-blue-50'
+              : 'border-gray-200 bg-white'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                !isHomeless ? 'border-blue-600' : 'border-gray-300'
+              }`}
+            >
+              {!isHomeless && (
+                <div className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+              )}
+            </div>
+            <div>
+              <p className="font-semibold text-gray-800">주택 소유자입니다</p>
+              <p className="text-gray-500 text-xs">현재 주택을 보유하고 있습니다</p>
+            </div>
+          </div>
+        </button>
+      </div>
+
+      {isHomeless && (
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-2">
+            무주택 기간
+          </label>
+          <div className="flex items-center gap-3">
+            <input
+              type="range"
+              min={0}
+              max={16}
+              value={homelessYears}
+              onChange={(e) =>
+                onChange('homelessYears', Number(e.target.value))
+              }
+              className="flex-1 accent-blue-600"
+            />
+            <span className="text-blue-600 font-bold text-lg w-16 text-right">
+              {homelessYears}년
+            </span>
+          </div>
+          <div className="flex justify-between text-xs text-gray-400 mt-1">
+            <span>1년 미만</span>
+            <span>16년 이상</span>
+          </div>
+          <p className="text-xs text-gray-500 mt-2">
+            예상 점수:{' '}
+            <span className="font-semibold text-blue-600">
+              {homelessYears <= 0 ? 2 : Math.min(homelessYears * 2, 32)}점
+            </span>{' '}
+            / 32점
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Step 2: 부양가족 수
+function Step2({
+  dependentsCount,
+  onChange,
+}: {
+  dependentsCount: number;
+  onChange: <K extends keyof EligibilityInput>(
+    key: K,
+    value: EligibilityInput[K],
+  ) => void;
+}) {
+  const scoreMap = [5, 10, 15, 20, 25, 30, 35];
+  const score = scoreMap[Math.min(dependentsCount, 6)];
+
+  return (
+    <div>
+      <h2 className="text-lg font-bold text-gray-900 mb-1">부양가족 수</h2>
+      <p className="text-gray-500 text-sm mb-5">
+        배우자, 자녀, 직계존속(부모님 등) 모두 포함하여 입력하세요.
+      </p>
+
+      <div className="flex items-center justify-center gap-6 mb-4">
+        <button
+          onClick={() =>
+            onChange('dependentsCount', Math.max(0, dependentsCount - 1))
+          }
+          className="w-12 h-12 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-2xl font-bold text-gray-700 transition-colors"
+        >
+          -
+        </button>
+        <div className="text-center">
+          <span className="text-5xl font-bold text-blue-600">
+            {dependentsCount}
+          </span>
+          <p className="text-gray-500 text-sm mt-1">명</p>
+        </div>
+        <button
+          onClick={() => onChange('dependentsCount', Math.min(6, dependentsCount + 1))}
+          className="w-12 h-12 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-2xl font-bold text-gray-700 transition-colors"
+        >
+          +
+        </button>
+      </div>
+
+      <div className="bg-blue-50 rounded-xl p-3 text-center">
+        <p className="text-sm text-gray-600">
+          부양가족 점수:{' '}
+          <span className="font-bold text-blue-600 text-lg">{score}점</span>{' '}
+          / 35점
+        </p>
+      </div>
+
+      <div className="mt-4 grid grid-cols-7 gap-1">
+        {[0, 1, 2, 3, 4, 5, 6].map((n) => (
+          <button
+            key={n}
+            onClick={() => onChange('dependentsCount', n)}
+            className={`py-2 rounded-lg text-sm font-semibold transition-colors ${
+              dependentsCount === n
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            {n === 6 ? '6+' : n}
+          </button>
+        ))}
+      </div>
+      <p className="text-xs text-gray-400 mt-2 text-center">
+        빠른 선택: 인원 수를 클릭하세요
+      </p>
+    </div>
+  );
+}
+
+// Step 3: 청약통장 정보
+function Step3({
+  subscriptionStartDate,
+  subscriptionPaymentCount,
+  subscriptionBalance,
+  onChange,
+}: {
+  subscriptionStartDate: string;
+  subscriptionPaymentCount: number;
+  subscriptionBalance: number;
+  onChange: <K extends keyof EligibilityInput>(
+    key: K,
+    value: EligibilityInput[K],
+  ) => void;
+}) {
+  return (
+    <div>
+      <h2 className="text-lg font-bold text-gray-900 mb-1">청약통장 정보</h2>
+      <p className="text-gray-500 text-sm mb-5">
+        청약통장(주택청약종합저축) 가입 정보를 입력하세요.
+      </p>
+
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+            가입 시작월
+          </label>
+          <input
+            type="month"
+            value={subscriptionStartDate}
+            onChange={(e) => onChange('subscriptionStartDate', e.target.value)}
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+            납입 횟수
+          </label>
+          <div className="relative">
+            <input
+              type="number"
+              min={0}
+              max={300}
+              value={subscriptionPaymentCount}
+              onChange={(e) =>
+                onChange('subscriptionPaymentCount', Number(e.target.value))
+              }
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800"
+              placeholder="예: 60"
+            />
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+              회
+            </span>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">
+            생애최초 특별공급은 12회 이상 납입 필요
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+            예치 금액
+          </label>
+          <div className="relative">
+            <input
+              type="number"
+              min={0}
+              value={subscriptionBalance}
+              onChange={(e) =>
+                onChange('subscriptionBalance', Number(e.target.value))
+              }
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800"
+              placeholder="예: 1500"
+            />
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
+              만원
+            </span>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">
+            서울 85m² 초과: 1,500만원 이상 필요
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Step 4: 거주 지역 선택
+function Step4({
+  region,
+  onChange,
+}: {
+  region: string;
+  onChange: <K extends keyof EligibilityInput>(
+    key: K,
+    value: EligibilityInput[K],
+  ) => void;
+}) {
+  return (
+    <div>
+      <h2 className="text-lg font-bold text-gray-900 mb-1">거주 지역</h2>
+      <p className="text-gray-500 text-sm mb-5">
+        현재 거주하시는 지역을 선택하세요.
+      </p>
+
+      <div className="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
+        {REGIONS.map((r) => (
+          <button
+            key={r}
+            onClick={() => onChange('region', r)}
+            className={`py-3 px-3 rounded-xl text-sm font-medium text-left transition-all ${
+              region === r
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            {r}
+          </button>
+        ))}
+      </div>
+
+      {region && (
+        <div className="mt-3 p-3 bg-blue-50 rounded-xl">
+          <p className="text-sm text-blue-700">
+            선택됨:{' '}
+            <span className="font-semibold">{region}</span>
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Step 5: 혼인 및 자녀 정보
+function Step5({
+  isMarried,
+  hasRecentChild,
+  onChange,
+}: {
+  isMarried: boolean;
+  hasRecentChild: boolean;
+  onChange: <K extends keyof EligibilityInput>(
+    key: K,
+    value: EligibilityInput[K],
+  ) => void;
+}) {
+  return (
+    <div>
+      <h2 className="text-lg font-bold text-gray-900 mb-1">혼인 및 자녀</h2>
+      <p className="text-gray-500 text-sm mb-5">
+        특별공급 자격 판정에 사용됩니다.
+      </p>
+
+      <div className="space-y-4">
+        <div>
+          <p className="text-sm font-semibold text-gray-700 mb-2">
+            혼인 여부
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => onChange('isMarried', true)}
+              className={`flex-1 py-3 rounded-xl border-2 font-semibold text-sm transition-all ${
+                isMarried
+                  ? 'border-blue-600 bg-blue-50 text-blue-700'
+                  : 'border-gray-200 bg-white text-gray-600'
+              }`}
+            >
+              기혼
+            </button>
+            <button
+              onClick={() => onChange('isMarried', false)}
+              className={`flex-1 py-3 rounded-xl border-2 font-semibold text-sm transition-all ${
+                !isMarried
+                  ? 'border-blue-600 bg-blue-50 text-blue-700'
+                  : 'border-gray-200 bg-white text-gray-600'
+              }`}
+            >
+              미혼
+            </button>
+          </div>
+          {isMarried && (
+            <p className="text-xs text-blue-600 mt-1.5">
+              신혼부부 특별공급 자격 검토 가능
+            </p>
+          )}
+        </div>
+
+        <div>
+          <p className="text-sm font-semibold text-gray-700 mb-2">
+            최근 2년 이내 자녀 출산 여부
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => onChange('hasRecentChild', true)}
+              className={`flex-1 py-3 rounded-xl border-2 font-semibold text-sm transition-all ${
+                hasRecentChild
+                  ? 'border-blue-600 bg-blue-50 text-blue-700'
+                  : 'border-gray-200 bg-white text-gray-600'
+              }`}
+            >
+              있음
+            </button>
+            <button
+              onClick={() => onChange('hasRecentChild', false)}
+              className={`flex-1 py-3 rounded-xl border-2 font-semibold text-sm transition-all ${
+                !hasRecentChild
+                  ? 'border-blue-600 bg-blue-50 text-blue-700'
+                  : 'border-gray-200 bg-white text-gray-600'
+              }`}
+            >
+              없음
+            </button>
+          </div>
+          {hasRecentChild && (
+            <p className="text-xs text-blue-600 mt-1.5">
+              출산가구 우대 혜택 적용 가능
+            </p>
+          )}
+        </div>
+
+        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+          <p className="text-xs text-amber-700">
+            혼인 기간 7년 이내이면 신혼부부 특별공급 신청이 가능합니다.
+            정확한 자격은 공고문을 확인하세요.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
