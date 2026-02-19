@@ -1,0 +1,51 @@
+// 청약 입력 데이터 타입
+export interface EligibilityInput {
+  // 무주택 정보
+  isHomeless: boolean;
+  homelessYears: number; // 무주택 기간 (년)
+
+  // 부양가족
+  dependentsCount: number; // 부양가족 수 (배우자 포함)
+
+  // 청약통장
+  subscriptionStartDate: string; // YYYY-MM 형식
+  subscriptionPaymentCount: number; // 납입 횟수
+  subscriptionBalance: number; // 예치 금액 (만원)
+
+  // 거주지역
+  region: string; // 광역시/도
+
+  // 혼인/자녀
+  isMarried: boolean;
+  hasRecentChild: boolean; // 최근 2년 내 자녀 출산
+}
+
+// 가점 결과 타입
+export interface ScoreResult {
+  homelessScore: number; // 무주택 점수 (0~32)
+  dependentsScore: number; // 부양가족 점수 (0~35)
+  subscriptionScore: number; // 청약통장 점수 (0~17)
+  totalScore: number; // 총점 (0~84)
+  tier: 'S' | 'A' | 'B' | 'C';
+  positioning: string;
+}
+
+// 특별공급 자격 타입
+export interface SpecialSupplyEligibility {
+  newlyWed: boolean; // 신혼부부
+  firstHome: boolean; // 생애최초
+  multiChild: boolean; // 다자녀
+}
+
+// 청약 공고 타입
+export interface Announcement {
+  id: string;
+  complexName: string; // 단지명
+  builder: string; // 건설사
+  region: string; // 지역
+  announcementDate: string; // 모집공고일
+  subscriptionStartDate: string; // 청약 접수 시작일
+  subscriptionEndDate: string; // 청약 접수 종료일
+  houseType: string; // 주택 유형
+  pdfUrl?: string; // 원문 공고문 URL
+}
