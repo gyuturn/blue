@@ -37,6 +37,9 @@ export interface SpecialSupplyEligibility {
   multiChild: boolean; // 다자녀
 }
 
+// 청약 접수 상태 타입
+export type SubscriptionStatus = '접수중' | '접수예정' | '마감';
+
 // 청약 공고 타입
 export interface Announcement {
   id: string;
@@ -48,4 +51,6 @@ export interface Announcement {
   subscriptionEndDate: string; // 청약 접수 종료일
   houseType: string; // 주택 유형
   pdfUrl?: string; // 원문 공고문 URL
+  totalHouseholds?: number; // 공급 세대수
+  status?: SubscriptionStatus; // 접수 상태
 }
