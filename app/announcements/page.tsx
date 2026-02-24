@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Disclaimer from '@/components/Disclaimer';
 import type { Announcement } from '@/types';
+import { getDday } from '@/lib/announcements';
 
 const REGION_OPTIONS = [
   '전체',
@@ -81,10 +82,16 @@ export default function AnnouncementsPage() {
               <h1 className="text-2xl font-bold text-gray-900">청약 공고</h1>
               <p className="text-gray-500 text-sm mt-1">최신 청약 공고를 확인하세요</p>
             </div>
-            {isMock && (
-              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-medium">
-                샘플 데이터
-              </span>
+            {!loading && (
+              isMock ? (
+                <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-medium">
+                  샘플 데이터
+                </span>
+              ) : (
+                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
+                  실시간 데이터
+                </span>
+              )
             )}
           </div>
         </div>
@@ -110,10 +117,11 @@ export default function AnnouncementsPage() {
         </div>
 
         {/* Mock data notice */}
-        {isMock && (
+        {!loading && isMock && (
           <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
             <p className="text-xs text-amber-700">
-              현재 샘플 데이터를 표시하고 있습니다. 실제 공고는{' '}
+              API 키를 설정하면 실제 데이터를 확인할 수 있어요. 현재는 샘플 데이터를 표시하고 있습니다.
+              실제 공고는{' '}
               <a
                 href="https://www.applyhome.co.kr"
                 target="_blank"
@@ -182,10 +190,32 @@ export default function AnnouncementsPage() {
   );
 }
 
+function StatusBadge({ status }: { status: string | undefined }) {
+  if (!status) return null;
+
+  const styles: Record<string, string> = {
+    '접수중': 'bg-green-100 text-green-700',
+    '접수예정': 'bg-blue-100 text-blue-700',
+    '마감': 'bg-gray-100 text-gray-500',
+  };
+
+  const cls = styles[status] ?? 'bg-gray-100 text-gray-500';
+
+  return (
+    <span className={`flex-shrink-0 text-xs px-2 py-0.5 rounded-full font-semibold ${cls}`}>
+      {status}
+    </span>
+  );
+}
+
 function AnnouncementCard({ announcement }: { announcement: Announcement }) {
-  const isUpcoming =
-    announcement.subscriptionStartDate &&
-    new Date(announcement.subscriptionStartDate) > new Date();
+  const dday = getDday(announcement.subscriptionStartDate, announcement.subscriptionEndDate);
+  const ddayStyle =
+    announcement.status === '접수중'
+      ? 'text-green-600 font-bold'
+      : announcement.status === '접수예정'
+      ? 'text-blue-600 font-bold'
+      : 'text-gray-400';
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -194,15 +224,7 @@ function AnnouncementCard({ announcement }: { announcement: Announcement }) {
           <h3 className="font-bold text-gray-900 text-sm leading-snug flex-1">
             {announcement.complexName}
           </h3>
-          <span
-            className={`flex-shrink-0 text-xs px-2 py-0.5 rounded-full font-semibold ${
-              isUpcoming
-                ? 'bg-blue-100 text-blue-700'
-                : 'bg-gray-100 text-gray-500'
-            }`}
-          >
-            {isUpcoming ? '청약 예정' : '진행중/마감'}
-          </span>
+          <StatusBadge status={announcement.status} />
         </div>
 
         <div className="space-y-1.5 text-xs text-gray-600">
@@ -218,6 +240,12 @@ function AnnouncementCard({ announcement }: { announcement: Announcement }) {
             <span className="text-gray-400 w-14 flex-shrink-0">유형</span>
             <span>{announcement.houseType}</span>
           </div>
+          {announcement.totalHouseholds !== undefined && (
+            <div className="flex items-center gap-2">
+              <span className="text-gray-400 w-14 flex-shrink-0">세대수</span>
+              <span>{announcement.totalHouseholds.toLocaleString()}세대</span>
+            </div>
+          )}
           {announcement.subscriptionStartDate && (
             <div className="flex items-center gap-2">
               <span className="text-gray-400 w-14 flex-shrink-0">접수기간</span>
@@ -225,6 +253,9 @@ function AnnouncementCard({ announcement }: { announcement: Announcement }) {
                 {announcement.subscriptionStartDate} ~{' '}
                 {announcement.subscriptionEndDate}
               </span>
+              {dday && (
+                <span className={`ml-auto text-xs ${ddayStyle}`}>{dday}</span>
+              )}
             </div>
           )}
         </div>
