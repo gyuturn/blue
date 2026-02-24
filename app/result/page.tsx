@@ -3,10 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Suspense } from 'react';
-import Link from 'next/link';
 import Disclaimer from '@/components/Disclaimer';
 import { calculateTotalScore, calculateSpecialSupply } from '@/lib/calculator';
-import type { EligibilityInput, ScoreResult, SpecialSupplyEligibility } from '@/types';
+import type { EligibilityInput, ScoreResult, SpecialSupplyEligibility, StoredScoreData } from '@/types';
 
 function ResultContent() {
   const searchParams = useSearchParams();
@@ -26,6 +25,15 @@ function ResultContent() {
       setInput(parsed);
       setScoreResult(calculateTotalScore(parsed));
       setSpecialSupply(calculateSpecialSupply(parsed));
+      const scoreData: StoredScoreData = {
+        input: parsed,
+        result: calculateTotalScore(parsed),
+        specialSupply: calculateSpecialSupply(parsed),
+        savedAt: Date.now(),
+      };
+      try {
+        sessionStorage.setItem('scoreData', JSON.stringify(scoreData));
+      } catch {}
     } catch {
       router.push('/calculator');
     }
@@ -201,16 +209,16 @@ function ResultContent() {
         </div>
 
         {/* Action Buttons */}
-        <div className="space-y-3 mb-4">
-          <Link
-            href="/announcements"
-            className="block w-full text-center py-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-md transition-colors"
+        <div className="flex gap-3 mb-4">
+          <button
+            onClick={() => router.push('/announcements')}
+            className="flex-1 text-center py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-md transition-colors px-6"
           >
-            청약 공고 보러가기
-          </Link>
+            내 점수로 공고 보기
+          </button>
           <button
             onClick={() => router.push('/calculator')}
-            className="block w-full text-center py-3.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold rounded-xl transition-colors"
+            className="flex-1 text-center py-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold rounded-xl transition-colors px-6"
           >
             다시 계산하기
           </button>

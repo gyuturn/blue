@@ -37,6 +37,14 @@ export interface SpecialSupplyEligibility {
   multiChild: boolean; // 다자녀
 }
 
+// sessionStorage 저장 스키마
+export interface StoredScoreData {
+  input: EligibilityInput;
+  result: ScoreResult;
+  specialSupply: SpecialSupplyEligibility;
+  savedAt: number;
+}
+
 // 청약 접수 상태 타입
 export type SubscriptionStatus = '접수중' | '접수예정' | '마감';
 
