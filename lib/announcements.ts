@@ -1,9 +1,8 @@
 import type { Announcement, SubscriptionStatus } from '@/types';
 
-// 날짜 형식 변환 (YYYYMMDD -> YYYY-MM-DD)
-function formatDate(yyyymmdd: string): string {
-  if (!yyyymmdd || yyyymmdd.length !== 8) return '';
-  return `${yyyymmdd.slice(0, 4)}-${yyyymmdd.slice(4, 6)}-${yyyymmdd.slice(6, 8)}`;
+// API 응답 날짜는 이미 YYYY-MM-DD 형식으로 반환됨
+function formatDate(date: string): string {
+  return date ?? '';
 }
 
 // 접수 상태 계산
@@ -52,28 +51,29 @@ export function getDday(startDate: string, endDate: string): string {
   return `D-${diffDays}`;
 }
 
-// 지역코드 매핑 (시도명 → API cond 파라미터 값)
+// API SUBSCRPT_AREA_CODE_NM 필드는 단축명 사용 (서울, 경기, ...)
+// 프론트에서 전체 이름(서울특별시)을 보내면 API 단축명으로 변환
 export const REGION_MAP: Record<string, string> = {
-  서울: '서울특별시',
-  경기: '경기도',
-  인천: '인천광역시',
-  부산: '부산광역시',
-  대구: '대구광역시',
-  광주: '광주광역시',
-  대전: '대전광역시',
-  울산: '울산광역시',
-  세종: '세종특별자치시',
-  강원: '강원특별자치도',
-  충북: '충청북도',
-  충남: '충청남도',
-  전북: '전북특별자치도',
-  전남: '전라남도',
-  경북: '경상북도',
-  경남: '경상남도',
-  제주: '제주특별자치도',
+  서울특별시: '서울',
+  경기도: '경기',
+  인천광역시: '인천',
+  부산광역시: '부산',
+  대구광역시: '대구',
+  광주광역시: '광주',
+  대전광역시: '대전',
+  울산광역시: '울산',
+  세종특별자치시: '세종',
+  강원특별자치도: '강원',
+  충청북도: '충북',
+  충청남도: '충남',
+  전북특별자치도: '전북',
+  전라남도: '전남',
+  경상북도: '경북',
+  경상남도: '경남',
+  제주특별자치도: '제주',
 };
 
-// 프론트에서 전체 이름을 보내는 경우 그대로 사용, 축약명인 경우 매핑
+// 전체 이름 → API 단축명 변환 (이미 단축명이면 그대로 반환)
 export function resolveRegionParam(region: string): string {
   return REGION_MAP[region] ?? region;
 }
