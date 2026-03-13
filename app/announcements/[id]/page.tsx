@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { use, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Disclaimer from '@/components/Disclaimer';
 import type { Announcement, StoredScoreData } from '@/types';
 import { getDday, getScoreTierLabel, getGeneralSupplyLabel, getSpecialSupplyLabels } from '@/lib/announcements';
 
-export default function AnnouncementDetailPage({ params }: { params: { id: string } }) {
+export default function AnnouncementDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const router = useRouter();
 
   const announcement = useMemo((): Announcement | null => {
@@ -14,11 +15,11 @@ export default function AnnouncementDetailPage({ params }: { params: { id: strin
       const stored = sessionStorage.getItem('selectedAnnouncement');
       if (!stored) return null;
       const parsed = JSON.parse(stored) as Announcement;
-      return parsed.id === params.id ? parsed : null;
+      return parsed.id === id ? parsed : null;
     } catch {
       return null;
     }
-  }, [params.id]);
+  }, [id]);
 
   const scoreData = useMemo((): StoredScoreData | null => {
     try {
