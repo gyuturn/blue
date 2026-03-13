@@ -61,4 +61,9 @@ export interface Announcement {
   pdfUrl?: string; // 원문 공고문 URL
   totalHouseholds?: number; // 공급 세대수
   status?: SubscriptionStatus; // 접수 상태
+  specialSupplyTypes?: {
+    newlyWed: boolean;   // 신혼부부 특별공급 있음
+    firstHome: boolean;  // 생애최초 특별공급 있음
+    multiChild: boolean; // 다자녀 특별공급 있음
+  };
 }

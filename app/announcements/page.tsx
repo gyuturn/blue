@@ -288,7 +288,7 @@ function AnnouncementCard({ announcement, scoreData }: { announcement: Announcem
 
   const tierLabel = scoreData ? getScoreTierLabel(scoreData.result.tier) : null;
   const generalSupply = scoreData ? getGeneralSupplyLabel(scoreData.input) : null;
-  const specialLabels = scoreData ? getSpecialSupplyLabels(scoreData.specialSupply) : [];
+  const specialLabels = scoreData ? getSpecialSupplyLabels(scoreData.specialSupply, announcement.specialSupplyTypes) : [];
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">

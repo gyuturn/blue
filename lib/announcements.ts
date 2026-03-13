@@ -140,6 +140,11 @@ export async function fetchAnnouncementsFromAPI(region?: string): Promise<Announ
         pdfUrl: item.PBLANC_URL,
         totalHouseholds: item.TOT_SUPLY_HSHLDCO ? Number(item.TOT_SUPLY_HSHLDCO) : undefined,
         status: status === '일정미정' ? undefined : status,
+        specialSupplyTypes: {
+          newlyWed: Number(item.NWWDS_SUPLY_HSHLDCO ?? 0) > 0,
+          firstHome: Number(item.LTTOT_TOP_SUPLY_HSHLDCO ?? 0) > 0,
+          multiChild: Number(item.MNYCH_HSHLD_SUPLY_HSHLDCO ?? 0) > 0,
+        },
       };
     });
   } catch (error) {
@@ -172,12 +177,18 @@ export function getGeneralSupplyLabel(input: EligibilityInput): { eligible: bool
   return { eligible: false, text: '일반공급 자격 미충족' };
 }
 
-// 특별공급 매칭 라벨
-export function getSpecialSupplyLabels(specialSupply: SpecialSupplyEligibility): string[] {
+// 특별공급 매칭 라벨 (사용자 자격 × 공고 제공 유형 교집합)
+export function getSpecialSupplyLabels(
+  specialSupply: SpecialSupplyEligibility,
+  announcementTypes?: { newlyWed: boolean; firstHome: boolean; multiChild: boolean },
+): string[] {
   const labels: string[] = [];
-  if (specialSupply.newlyWed) labels.push('신혼부부 특공');
-  if (specialSupply.firstHome) labels.push('생애최초 특공');
-  if (specialSupply.multiChild) labels.push('다자녀 특공');
+  const newlyWed = announcementTypes ? announcementTypes.newlyWed && specialSupply.newlyWed : specialSupply.newlyWed;
+  const firstHome = announcementTypes ? announcementTypes.firstHome && specialSupply.firstHome : specialSupply.firstHome;
+  const multiChild = announcementTypes ? announcementTypes.multiChild && specialSupply.multiChild : specialSupply.multiChild;
+  if (newlyWed) labels.push('신혼부부 특공 가능');
+  if (firstHome) labels.push('생애최초 특공 가능');
+  if (multiChild) labels.push('다자녀 특공 가능');
   return labels;
 }
 
@@ -194,6 +205,7 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     houseType: '민영주택',
     pdfUrl: 'https://www.applyhome.co.kr',
     totalHouseholds: 350,
+    specialSupplyTypes: { newlyWed: true, firstHome: true, multiChild: false },
   },
   {
     id: 'mock-002',
@@ -206,6 +218,7 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     houseType: '민영주택',
     pdfUrl: 'https://www.applyhome.co.kr',
     totalHouseholds: 520,
+    specialSupplyTypes: { newlyWed: true, firstHome: false, multiChild: true },
   },
   {
     id: 'mock-003',
@@ -218,6 +231,7 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     houseType: '민영주택',
     pdfUrl: 'https://www.applyhome.co.kr',
     totalHouseholds: 280,
+    specialSupplyTypes: { newlyWed: false, firstHome: true, multiChild: false },
   },
   {
     id: 'mock-004',
@@ -230,6 +244,7 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     houseType: '민영주택',
     pdfUrl: 'https://www.applyhome.co.kr',
     totalHouseholds: 410,
+    specialSupplyTypes: { newlyWed: true, firstHome: true, multiChild: true },
   },
   {
     id: 'mock-005',
@@ -242,6 +257,7 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     houseType: '민영주택',
     pdfUrl: 'https://www.applyhome.co.kr',
     totalHouseholds: 195,
+    specialSupplyTypes: { newlyWed: false, firstHome: false, multiChild: false },
   },
   {
     id: 'mock-006',
@@ -254,6 +270,7 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     houseType: '민영주택',
     pdfUrl: 'https://www.applyhome.co.kr',
     totalHouseholds: 320,
+    specialSupplyTypes: { newlyWed: true, firstHome: false, multiChild: false },
   },
   {
     id: 'mock-007',
@@ -266,6 +283,7 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     houseType: '공공임대',
     pdfUrl: 'https://www.applyhome.co.kr',
     totalHouseholds: 150,
+    specialSupplyTypes: { newlyWed: true, firstHome: true, multiChild: true },
   },
   {
     id: 'mock-008',
@@ -278,5 +296,6 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     houseType: '민영주택',
     pdfUrl: 'https://www.applyhome.co.kr',
     totalHouseholds: 240,
+    specialSupplyTypes: { newlyWed: false, firstHome: true, multiChild: false },
   },
 ];
