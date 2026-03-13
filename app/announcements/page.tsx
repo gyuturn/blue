@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Disclaimer from '@/components/Disclaimer';
-import type { Announcement } from '@/types';
-import { getDday } from '@/lib/announcements';
+import type { Announcement, StoredScoreData } from '@/types';
+import { getDday, getScoreTierLabel, getGeneralSupplyLabel, getSpecialSupplyLabels } from '@/lib/announcements';
 
 const REGION_OPTIONS = [
   '전체',
@@ -27,12 +27,38 @@ const REGION_OPTIONS = [
   '제주특별자치도',
 ];
 
+const tierBadgeStyle: Record<string, string> = {
+  S: 'bg-yellow-100 text-yellow-700',
+  A: 'bg-blue-100 text-blue-700',
+  B: 'bg-green-100 text-green-700',
+  C: 'bg-gray-100 text-gray-700',
+};
+
 export default function AnnouncementsPage() {
   const router = useRouter();
+  const [scoreData, setScoreData] = useState<StoredScoreData | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRegion, setSelectedRegion] = useState('전체');
   const [isMock, setIsMock] = useState(false);
+  const [hideExpired, setHideExpired] = useState(true);
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('scoreData');
+      if (!raw) {
+        router.push('/calculator');
+        return;
+      }
+      const parsed: StoredScoreData = JSON.parse(raw);
+      setScoreData(parsed);
+    } catch {
+      router.push('/calculator');
+    } finally {
+      setAuthChecked(true);
+    }
+  }, [router]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -52,6 +78,18 @@ export default function AnnouncementsPage() {
     };
     fetchData();
   }, [selectedRegion]);
+
+  const filteredAnnouncements = hideExpired
+    ? announcements.filter(a => a.status !== '마감')
+    : announcements;
+
+  if (!authChecked) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -96,9 +134,40 @@ export default function AnnouncementsPage() {
           </div>
         </div>
 
-        {/* Region Filter */}
+        {/* Score Summary Bar */}
+        {scoreData && (
+          <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-4">
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-600">내 가점</span>
+              <span className="text-lg font-bold text-blue-700">{scoreData.result.totalScore}점</span>
+              <span className="text-xs text-gray-500">/ 84점</span>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${tierBadgeStyle[scoreData.result.tier]}`}>
+                {scoreData.result.tier}등급
+              </span>
+            </div>
+            <button
+              onClick={() => router.push('/calculator')}
+              className="text-xs text-blue-600 underline"
+            >
+              재계산
+            </button>
+          </div>
+        )}
+
+        {/* Region Filter & Expired Toggle */}
         <div className="mb-4">
-          <p className="text-xs font-semibold text-gray-500 mb-2">지역 필터</p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-gray-500">지역 필터</p>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">마감 포함</span>
+              <button
+                onClick={() => setHideExpired(!hideExpired)}
+                className={`relative w-10 h-5 rounded-full transition-colors ${hideExpired ? 'bg-gray-300' : 'bg-blue-500'}`}
+              >
+                <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${hideExpired ? 'left-0.5' : 'left-5'}`} />
+              </button>
+            </div>
+          </div>
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
             {REGION_OPTIONS.map((region) => (
               <button
@@ -149,7 +218,7 @@ export default function AnnouncementsPage() {
               </div>
             ))}
           </div>
-        ) : announcements.length === 0 ? (
+        ) : filteredAnnouncements.length === 0 ? (
           <div className="text-center py-12">
             <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
               <svg
@@ -171,16 +240,16 @@ export default function AnnouncementsPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {announcements.map((item) => (
-              <AnnouncementCard key={item.id} announcement={item} />
+            {filteredAnnouncements.map((item) => (
+              <AnnouncementCard key={item.id} announcement={item} scoreData={scoreData} />
             ))}
           </div>
         )}
 
         {/* Total count */}
-        {!loading && announcements.length > 0 && (
+        {!loading && filteredAnnouncements.length > 0 && (
           <p className="text-xs text-gray-400 text-center mt-4">
-            총 {announcements.length}건의 공고
+            총 {filteredAnnouncements.length}건의 공고
           </p>
         )}
 
@@ -208,7 +277,7 @@ function StatusBadge({ status }: { status: string | undefined }) {
   );
 }
 
-function AnnouncementCard({ announcement }: { announcement: Announcement }) {
+function AnnouncementCard({ announcement, scoreData }: { announcement: Announcement; scoreData: StoredScoreData | null }) {
   const dday = getDday(announcement.subscriptionStartDate, announcement.subscriptionEndDate);
   const ddayStyle =
     announcement.status === '접수중'
@@ -216,6 +285,10 @@ function AnnouncementCard({ announcement }: { announcement: Announcement }) {
       : announcement.status === '접수예정'
       ? 'text-blue-600 font-bold'
       : 'text-gray-400';
+
+  const tierLabel = scoreData ? getScoreTierLabel(scoreData.result.tier) : null;
+  const generalSupply = scoreData ? getGeneralSupplyLabel(scoreData.input) : null;
+  const specialLabels = scoreData ? getSpecialSupplyLabels(scoreData.specialSupply, announcement.specialSupplyTypes) : [];
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -260,6 +333,26 @@ function AnnouncementCard({ announcement }: { announcement: Announcement }) {
           )}
         </div>
       </div>
+
+      {scoreData && (
+        <div className="flex flex-wrap gap-1.5 px-4 pb-3">
+          {tierLabel && (
+            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${tierLabel.style}`}>
+              {tierLabel.text}
+            </span>
+          )}
+          {generalSupply && !generalSupply.eligible && (
+            <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-red-50 text-red-500">
+              {generalSupply.text}
+            </span>
+          )}
+          {specialLabels.map((label) => (
+            <span key={label} className="text-xs px-2 py-0.5 rounded-full font-semibold bg-purple-100 text-purple-700">
+              {label}
+            </span>
+          ))}
+        </div>
+      )}
 
       {announcement.pdfUrl && (
         <div className="border-t border-gray-100 px-4 py-3">

@@ -37,6 +37,14 @@ export interface SpecialSupplyEligibility {
   multiChild: boolean; // 다자녀
 }
 
+// sessionStorage 저장 스키마
+export interface StoredScoreData {
+  input: EligibilityInput;
+  result: ScoreResult;
+  specialSupply: SpecialSupplyEligibility;
+  savedAt: number;
+}
+
 // 청약 접수 상태 타입
 export type SubscriptionStatus = '접수중' | '접수예정' | '마감';
 
@@ -53,4 +61,9 @@ export interface Announcement {
   pdfUrl?: string; // 원문 공고문 URL
   totalHouseholds?: number; // 공급 세대수
   status?: SubscriptionStatus; // 접수 상태
+  specialSupplyTypes?: {
+    newlyWed: boolean;   // 신혼부부 특별공급 있음
+    firstHome: boolean;  // 생애최초 특별공급 있음
+    multiChild: boolean; // 다자녀 특별공급 있음
+  };
 }

@@ -1,37 +1,48 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Suspense } from 'react';
-import Link from 'next/link';
 import Disclaimer from '@/components/Disclaimer';
 import { calculateTotalScore, calculateSpecialSupply } from '@/lib/calculator';
-import type { EligibilityInput, ScoreResult, SpecialSupplyEligibility } from '@/types';
+import type { EligibilityInput, StoredScoreData } from '@/types';
 
 function ResultContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [scoreResult, setScoreResult] = useState<ScoreResult | null>(null);
-  const [specialSupply, setSpecialSupply] = useState<SpecialSupplyEligibility | null>(null);
-  const [input, setInput] = useState<EligibilityInput | null>(null);
+
+  const data = useMemo(() => {
+    const dataParam = searchParams.get('data');
+    if (!dataParam) return null;
+    try {
+      const parsed: EligibilityInput = JSON.parse(dataParam);
+      return {
+        input: parsed,
+        scoreResult: calculateTotalScore(parsed),
+        specialSupply: calculateSpecialSupply(parsed),
+      };
+    } catch {
+      return null;
+    }
+  }, [searchParams]);
 
   useEffect(() => {
-    const dataParam = searchParams.get('data');
-    if (!dataParam) {
+    if (!data) {
       router.push('/calculator');
       return;
     }
+    const scoreData: StoredScoreData = {
+      input: data.input,
+      result: data.scoreResult,
+      specialSupply: data.specialSupply,
+      savedAt: Date.now(),
+    };
     try {
-      const parsed: EligibilityInput = JSON.parse(dataParam);
-      setInput(parsed);
-      setScoreResult(calculateTotalScore(parsed));
-      setSpecialSupply(calculateSpecialSupply(parsed));
-    } catch {
-      router.push('/calculator');
-    }
-  }, [searchParams, router]);
+      sessionStorage.setItem('scoreData', JSON.stringify(scoreData));
+    } catch {}
+  }, [data, router]);
 
-  if (!scoreResult || !specialSupply || !input) {
+  if (!data) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -41,6 +52,8 @@ function ResultContent() {
       </div>
     );
   }
+
+  const { scoreResult, specialSupply, input } = data;
 
   const tierConfig = {
     S: { color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-300', label: 'S등급', emoji: '최우수' },
@@ -201,16 +214,16 @@ function ResultContent() {
         </div>
 
         {/* Action Buttons */}
-        <div className="space-y-3 mb-4">
-          <Link
-            href="/announcements"
-            className="block w-full text-center py-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-md transition-colors"
+        <div className="flex gap-3 mb-4">
+          <button
+            onClick={() => router.push('/announcements')}
+            className="flex-1 text-center py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-md transition-colors px-6"
           >
-            청약 공고 보러가기
-          </Link>
+            내 점수로 공고 보기
+          </button>
           <button
             onClick={() => router.push('/calculator')}
-            className="block w-full text-center py-3.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold rounded-xl transition-colors"
+            className="flex-1 text-center py-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold rounded-xl transition-colors px-6"
           >
             다시 계산하기
           </button>
