@@ -350,6 +350,21 @@ function Step2({
   );
 }
 
+function formatMonthsToYears(months: number): string {
+  if (months <= 0) return '';
+  const years = Math.floor(months / 12);
+  const remaining = months % 12;
+  if (years === 0) return `${months}회 = ${months}개월`;
+  if (remaining === 0) return `${months}회 = 약 ${years}년`;
+  return `${months}회 = 약 ${years}년 ${remaining}개월`;
+}
+
+function formatWithComma(value: number): string {
+  if (value <= 0) return '';
+  return value.toLocaleString('ko-KR');
+}
+
+
 // Step 3: 청약통장 정보
 function Step3({
   subscriptionStartDate,
@@ -365,6 +380,13 @@ function Step3({
     value: EligibilityInput[K],
   ) => void;
 }) {
+  const [displayBalance, setDisplayBalance] = useState(formatWithComma(subscriptionBalance));
+
+  const paymentHint = formatMonthsToYears(subscriptionPaymentCount);
+  const wonDisplay = subscriptionBalance > 0
+    ? `= ${(subscriptionBalance * 10000).toLocaleString('ko-KR')}원`
+    : null;
+
   return (
     <div>
       <h2 className="text-lg font-bold text-gray-900 mb-1">청약통장 정보</h2>
@@ -392,11 +414,12 @@ function Step3({
           <div className="relative">
             <input
               type="number"
+              inputMode="numeric"
               min={0}
-              max={300}
-              value={subscriptionPaymentCount}
+              max={600}
+              value={subscriptionPaymentCount === 0 ? '' : subscriptionPaymentCount}
               onChange={(e) =>
-                onChange('subscriptionPaymentCount', Number(e.target.value))
+                onChange('subscriptionPaymentCount', Number(e.target.value) || 0)
               }
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800"
               placeholder="예: 60"
@@ -405,9 +428,13 @@ function Step3({
               회
             </span>
           </div>
-          <p className="text-xs text-gray-400 mt-1">
-            생애최초 특별공급은 12회 이상 납입 필요
-          </p>
+          {paymentHint ? (
+            <p className="text-xs text-blue-500 mt-1">💡 {paymentHint}</p>
+          ) : (
+            <p className="text-xs text-gray-400 mt-1">
+              생애최초 특별공급은 12회 이상 납입 필요
+            </p>
+          )}
         </div>
 
         <div>
@@ -416,22 +443,29 @@ function Step3({
           </label>
           <div className="relative">
             <input
-              type="number"
-              min={0}
-              value={subscriptionBalance}
-              onChange={(e) =>
-                onChange('subscriptionBalance', Number(e.target.value))
-              }
+              type="text"
+              inputMode="numeric"
+              value={displayBalance}
+              onChange={(e) => {
+                const raw = e.target.value.replace(/[^0-9]/g, '');
+                const num = Number(raw) || 0;
+                setDisplayBalance(raw === '' ? '' : num.toLocaleString('ko-KR'));
+                onChange('subscriptionBalance', num);
+              }}
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800"
-              placeholder="예: 1500"
+              placeholder="예: 1,500"
             />
             <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
               만원
             </span>
           </div>
-          <p className="text-xs text-gray-400 mt-1">
-            서울 85m² 초과: 1,500만원 이상 필요
-          </p>
+          {wonDisplay ? (
+            <p className="text-xs text-blue-500 mt-1">💡 {wonDisplay}</p>
+          ) : (
+            <p className="text-xs text-gray-400 mt-1">
+              서울 85m² 초과: 1,500만원 이상 필요
+            </p>
+          )}
         </div>
       </div>
     </div>
