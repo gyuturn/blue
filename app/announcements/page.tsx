@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Disclaimer from '@/components/Disclaimer';
 import type { Announcement, StoredScoreData } from '@/types';
-import { getDday } from '@/lib/announcements';
+import { getDday, getScoreTierLabel, getGeneralSupplyLabel, getSpecialSupplyLabels } from '@/lib/announcements';
 
 const REGION_OPTIONS = [
   '전체',
@@ -241,7 +241,7 @@ export default function AnnouncementsPage() {
         ) : (
           <div className="space-y-3">
             {filteredAnnouncements.map((item) => (
-              <AnnouncementCard key={item.id} announcement={item} />
+              <AnnouncementCard key={item.id} announcement={item} scoreData={scoreData} />
             ))}
           </div>
         )}
@@ -277,7 +277,7 @@ function StatusBadge({ status }: { status: string | undefined }) {
   );
 }
 
-function AnnouncementCard({ announcement }: { announcement: Announcement }) {
+function AnnouncementCard({ announcement, scoreData }: { announcement: Announcement; scoreData: StoredScoreData | null }) {
   const dday = getDday(announcement.subscriptionStartDate, announcement.subscriptionEndDate);
   const ddayStyle =
     announcement.status === '접수중'
@@ -285,6 +285,10 @@ function AnnouncementCard({ announcement }: { announcement: Announcement }) {
       : announcement.status === '접수예정'
       ? 'text-blue-600 font-bold'
       : 'text-gray-400';
+
+  const tierLabel = scoreData ? getScoreTierLabel(scoreData.result.tier) : null;
+  const generalSupply = scoreData ? getGeneralSupplyLabel(scoreData.input) : null;
+  const specialLabels = scoreData ? getSpecialSupplyLabels(scoreData.specialSupply) : [];
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -329,6 +333,26 @@ function AnnouncementCard({ announcement }: { announcement: Announcement }) {
           )}
         </div>
       </div>
+
+      {scoreData && (
+        <div className="flex flex-wrap gap-1.5 px-4 pb-3">
+          {tierLabel && (
+            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${tierLabel.style}`}>
+              {tierLabel.text}
+            </span>
+          )}
+          {generalSupply && !generalSupply.eligible && (
+            <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-red-50 text-red-500">
+              {generalSupply.text}
+            </span>
+          )}
+          {specialLabels.map((label) => (
+            <span key={label} className="text-xs px-2 py-0.5 rounded-full font-semibold bg-purple-100 text-purple-700">
+              {label}
+            </span>
+          ))}
+        </div>
+      )}
 
       {announcement.pdfUrl && (
         <div className="border-t border-gray-100 px-4 py-3">

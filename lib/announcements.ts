@@ -1,4 +1,4 @@
-import type { Announcement, SubscriptionStatus } from '@/types';
+import type { Announcement, EligibilityInput, SpecialSupplyEligibility, SubscriptionStatus } from '@/types';
 
 // API 응답 날짜는 이미 YYYY-MM-DD 형식으로 반환됨
 function formatDate(date: string): string {
@@ -151,6 +151,34 @@ export async function fetchAnnouncementsFromAPI(region?: string): Promise<Announ
     console.error('[API] Unexpected error:', error);
     return [];
   }
+}
+
+// 등급 기반 추천 라벨
+export function getScoreTierLabel(tier: 'S' | 'A' | 'B' | 'C'): { text: string; style: string } {
+  if (tier === 'S' || tier === 'A') {
+    return { text: '경쟁력 높음', style: 'bg-green-100 text-green-700' };
+  }
+  if (tier === 'B') {
+    return { text: '평균 수준', style: 'bg-yellow-100 text-yellow-700' };
+  }
+  return { text: '경쟁 어려울 수 있음', style: 'bg-gray-100 text-gray-600' };
+}
+
+// 일반공급 자격 여부
+export function getGeneralSupplyLabel(input: EligibilityInput): { eligible: boolean; text: string } {
+  if (input.isHomeless && input.subscriptionPaymentCount >= 1) {
+    return { eligible: true, text: '일반공급 자격 있음' };
+  }
+  return { eligible: false, text: '일반공급 자격 미충족' };
+}
+
+// 특별공급 매칭 라벨
+export function getSpecialSupplyLabels(specialSupply: SpecialSupplyEligibility): string[] {
+  const labels: string[] = [];
+  if (specialSupply.newlyWed) labels.push('신혼부부 특공');
+  if (specialSupply.firstHome) labels.push('생애최초 특공');
+  if (specialSupply.multiChild) labels.push('다자녀 특공');
+  return labels;
 }
 
 // Mock 데이터

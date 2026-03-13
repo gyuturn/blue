@@ -1,45 +1,48 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Suspense } from 'react';
 import Disclaimer from '@/components/Disclaimer';
 import { calculateTotalScore, calculateSpecialSupply } from '@/lib/calculator';
-import type { EligibilityInput, ScoreResult, SpecialSupplyEligibility, StoredScoreData } from '@/types';
+import type { EligibilityInput, StoredScoreData } from '@/types';
 
 function ResultContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [scoreResult, setScoreResult] = useState<ScoreResult | null>(null);
-  const [specialSupply, setSpecialSupply] = useState<SpecialSupplyEligibility | null>(null);
-  const [input, setInput] = useState<EligibilityInput | null>(null);
+
+  const data = useMemo(() => {
+    const dataParam = searchParams.get('data');
+    if (!dataParam) return null;
+    try {
+      const parsed: EligibilityInput = JSON.parse(dataParam);
+      return {
+        input: parsed,
+        scoreResult: calculateTotalScore(parsed),
+        specialSupply: calculateSpecialSupply(parsed),
+      };
+    } catch {
+      return null;
+    }
+  }, [searchParams]);
 
   useEffect(() => {
-    const dataParam = searchParams.get('data');
-    if (!dataParam) {
+    if (!data) {
       router.push('/calculator');
       return;
     }
+    const scoreData: StoredScoreData = {
+      input: data.input,
+      result: data.scoreResult,
+      specialSupply: data.specialSupply,
+      savedAt: Date.now(),
+    };
     try {
-      const parsed: EligibilityInput = JSON.parse(dataParam);
-      setInput(parsed);
-      setScoreResult(calculateTotalScore(parsed));
-      setSpecialSupply(calculateSpecialSupply(parsed));
-      const scoreData: StoredScoreData = {
-        input: parsed,
-        result: calculateTotalScore(parsed),
-        specialSupply: calculateSpecialSupply(parsed),
-        savedAt: Date.now(),
-      };
-      try {
-        sessionStorage.setItem('scoreData', JSON.stringify(scoreData));
-      } catch {}
-    } catch {
-      router.push('/calculator');
-    }
-  }, [searchParams, router]);
+      sessionStorage.setItem('scoreData', JSON.stringify(scoreData));
+    } catch {}
+  }, [data, router]);
 
-  if (!scoreResult || !specialSupply || !input) {
+  if (!data) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -49,6 +52,8 @@ function ResultContent() {
       </div>
     );
   }
+
+  const { scoreResult, specialSupply, input } = data;
 
   const tierConfig = {
     S: { color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-300', label: 'S등급', emoji: '최우수' },
