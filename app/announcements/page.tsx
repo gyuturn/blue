@@ -278,7 +278,15 @@ function StatusBadge({ status }: { status: string | undefined }) {
 }
 
 function AnnouncementCard({ announcement, scoreData }: { announcement: Announcement; scoreData: StoredScoreData | null }) {
+  const router = useRouter();
   const dday = getDday(announcement.subscriptionStartDate, announcement.subscriptionEndDate);
+
+  const handleCardClick = () => {
+    try {
+      sessionStorage.setItem('selectedAnnouncement', JSON.stringify(announcement));
+    } catch {}
+    router.push(`/announcements/${announcement.id}`);
+  };
   const ddayStyle =
     announcement.status === '접수중'
       ? 'text-green-600 font-bold'
@@ -291,7 +299,10 @@ function AnnouncementCard({ announcement, scoreData }: { announcement: Announcem
   const specialLabels = scoreData ? getSpecialSupplyLabels(scoreData.specialSupply, announcement.specialSupplyTypes) : [];
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+    <div
+      onClick={handleCardClick}
+      className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden cursor-pointer hover:shadow-md hover:border-blue-100 transition-all"
+    >
       <div className="p-4">
         <div className="flex items-start justify-between gap-2 mb-2">
           <h3 className="font-bold text-gray-900 text-sm leading-snug flex-1">
@@ -360,6 +371,7 @@ function AnnouncementCard({ announcement, scoreData }: { announcement: Announcem
             href={announcement.pdfUrl}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
             className="flex items-center justify-center gap-2 text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
           >
             <svg
