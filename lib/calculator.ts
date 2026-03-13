@@ -91,27 +91,34 @@ export function calculateTotalScore(input: EligibilityInput): ScoreResult {
 }
 
 /**
+ * 혼인 기간 계산 (년 단위)
+ */
+export function calcMarriageYears(marriageDate: string): number {
+  if (!marriageDate) return Infinity;
+  const [year, month] = marriageDate.split('-').map(Number);
+  if (!year || !month) return Infinity;
+  const start = new Date(year, month - 1, 1);
+  return (new Date().getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+}
+
+/**
  * 특별공급 자격 판정
- * - 신혼부부: 혼인 상태이고 혼인 기간 7년 이내 (isMarried 활용)
- * - 생애최초: 무주택자이고 청약통장 가입
- * - 다자녀: 부양가족(미성년 자녀) 3명 이상
+ * - 신혼부부: 기혼 + 혼인 7년 이내
+ * - 생애최초: 무주택 + 청약통장 납입 12회 이상
+ * - 다자녀: 미성년(만 19세 미만) 자녀 3명 이상
  */
 export function calculateSpecialSupply(
   input: EligibilityInput,
 ): SpecialSupplyEligibility {
-  // 신혼부부: 혼인 상태
-  const newlyWed = input.isMarried;
+  // 신혼부부: 기혼 + 혼인 7년 이내
+  const newlyWed = input.isMarried && calcMarriageYears(input.marriageDate) <= 7;
 
   // 생애최초: 무주택 + 청약통장 납입 횟수 12회 이상
   const firstHome =
     input.isHomeless && input.subscriptionPaymentCount >= 12;
 
-  // 다자녀: 부양가족 3명 이상 (자녀 기준 - 간략화된 판정)
-  // 배우자 포함 부양가족 수에서 배우자 1명을 빼면 자녀 수로 간주
-  const childCount = input.isMarried
-    ? Math.max(0, input.dependentsCount - 1)
-    : input.dependentsCount;
-  const multiChild = childCount >= 3;
+  // 다자녀: 미성년(만 19세 미만) 자녀 3명 이상
+  const multiChild = (input.childrenCount ?? 0) >= 3;
 
   return { newlyWed, firstHome, multiChild };
 }

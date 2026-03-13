@@ -39,6 +39,8 @@ const defaultInput: EligibilityInput = {
   subscriptionBalance: 0,
   region: '',
   isMarried: false,
+  marriageDate: '',
+  childrenCount: 0,
   hasRecentChild: false,
 };
 
@@ -135,6 +137,8 @@ export default function CalculatorPage() {
           {step === 5 && (
             <Step5
               isMarried={input.isMarried}
+              marriageDate={input.marriageDate}
+              childrenCount={input.childrenCount}
               hasRecentChild={input.hasRecentChild}
               onChange={updateInput}
             />
@@ -521,16 +525,39 @@ function Step4({
 // Step 5: 혼인 및 자녀 정보
 function Step5({
   isMarried,
+  marriageDate,
+  childrenCount,
   hasRecentChild,
   onChange,
 }: {
   isMarried: boolean;
+  marriageDate: string;
+  childrenCount: number;
   hasRecentChild: boolean;
   onChange: <K extends keyof EligibilityInput>(
     key: K,
     value: EligibilityInput[K],
   ) => void;
 }) {
+  const today = new Date().toISOString().slice(0, 7);
+
+  const marriageYearsHint = (() => {
+    if (!marriageDate) return null;
+    const [y, m] = marriageDate.split('-').map(Number);
+    if (!y || !m) return null;
+    const diffMs = new Date().getTime() - new Date(y, m - 1, 1).getTime();
+    const totalMonths = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 30.44));
+    const years = Math.floor(totalMonths / 12);
+    const months = totalMonths % 12;
+    const label = years > 0 ? `${years}년 ${months > 0 ? `${months}개월` : ''}`.trim() : `${months}개월`;
+    const eligible = diffMs / (1000 * 60 * 60 * 24 * 365.25) <= 7;
+    return eligible ? `혼인 ${label} → 신혼부부 특공 자격 있음` : `혼인 ${label} → 7년 초과로 자격 없음`;
+  })();
+
+  const childrenHint = childrenCount >= 3
+    ? '다자녀 특공 자격 있음'
+    : `${3 - childrenCount}명 더 있으면 다자녀 특공 가능`;
+
   return (
     <div>
       <h2 className="text-lg font-bold text-gray-900 mb-1">혼인 및 자녀</h2>
@@ -539,39 +566,79 @@ function Step5({
       </p>
 
       <div className="space-y-4">
+        {/* 혼인 여부 */}
         <div>
-          <p className="text-sm font-semibold text-gray-700 mb-2">
-            혼인 여부
-          </p>
+          <p className="text-sm font-semibold text-gray-700 mb-2">혼인 여부</p>
           <div className="flex gap-3">
             <button
               onClick={() => onChange('isMarried', true)}
               className={`flex-1 py-3 rounded-xl border-2 font-semibold text-sm transition-all ${
-                isMarried
-                  ? 'border-blue-600 bg-blue-50 text-blue-700'
-                  : 'border-gray-200 bg-white text-gray-600'
+                isMarried ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600'
               }`}
             >
               기혼
             </button>
             <button
-              onClick={() => onChange('isMarried', false)}
+              onClick={() => {
+                onChange('isMarried', false);
+                onChange('marriageDate', '');
+              }}
               className={`flex-1 py-3 rounded-xl border-2 font-semibold text-sm transition-all ${
-                !isMarried
-                  ? 'border-blue-600 bg-blue-50 text-blue-700'
-                  : 'border-gray-200 bg-white text-gray-600'
+                !isMarried ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600'
               }`}
             >
               미혼
             </button>
           </div>
-          {isMarried && (
-            <p className="text-xs text-blue-600 mt-1.5">
-              신혼부부 특별공급 자격 검토 가능
-            </p>
-          )}
         </div>
 
+        {/* 혼인 날짜 — 기혼일 때만 표시 */}
+        {isMarried && (
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              혼인 날짜
+            </label>
+            <input
+              type="month"
+              max={today}
+              value={marriageDate}
+              onChange={(e) => onChange('marriageDate', e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800"
+            />
+            {marriageYearsHint && (
+              <p className={`text-xs mt-1 ${marriageYearsHint.includes('없음') ? 'text-red-500' : 'text-blue-500'}`}>
+                💡 {marriageYearsHint}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* 미성년 자녀 수 */}
+        <div>
+          <p className="text-sm font-semibold text-gray-700 mb-2">
+            미성년 자녀 수 <span className="font-normal text-gray-400">(만 19세 미만)</span>
+          </p>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => onChange('childrenCount', Math.max(0, childrenCount - 1))}
+              className="w-12 h-12 rounded-xl border-2 border-gray-200 text-xl font-bold text-gray-600 hover:border-blue-400 transition-colors flex items-center justify-center"
+            >
+              −
+            </button>
+            <span className="text-2xl font-bold text-gray-900 w-8 text-center">{childrenCount}</span>
+            <button
+              onClick={() => onChange('childrenCount', childrenCount + 1)}
+              className="w-12 h-12 rounded-xl border-2 border-gray-200 text-xl font-bold text-gray-600 hover:border-blue-400 transition-colors flex items-center justify-center"
+            >
+              +
+            </button>
+          </div>
+          <p className={`text-xs mt-1.5 ${childrenCount >= 3 ? 'text-blue-500' : 'text-gray-400'}`}>
+            💡 {childrenHint}
+          </p>
+        </div>
+
+        {/* 최근 2년 이내 출산 */}
         <div>
           <p className="text-sm font-semibold text-gray-700 mb-2">
             최근 2년 이내 자녀 출산 여부
@@ -580,9 +647,7 @@ function Step5({
             <button
               onClick={() => onChange('hasRecentChild', true)}
               className={`flex-1 py-3 rounded-xl border-2 font-semibold text-sm transition-all ${
-                hasRecentChild
-                  ? 'border-blue-600 bg-blue-50 text-blue-700'
-                  : 'border-gray-200 bg-white text-gray-600'
+                hasRecentChild ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600'
               }`}
             >
               있음
@@ -590,25 +655,20 @@ function Step5({
             <button
               onClick={() => onChange('hasRecentChild', false)}
               className={`flex-1 py-3 rounded-xl border-2 font-semibold text-sm transition-all ${
-                !hasRecentChild
-                  ? 'border-blue-600 bg-blue-50 text-blue-700'
-                  : 'border-gray-200 bg-white text-gray-600'
+                !hasRecentChild ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600'
               }`}
             >
               없음
             </button>
           </div>
           {hasRecentChild && (
-            <p className="text-xs text-blue-600 mt-1.5">
-              출산가구 우대 혜택 적용 가능
-            </p>
+            <p className="text-xs text-blue-600 mt-1.5">출산가구 우대 혜택 적용 가능</p>
           )}
         </div>
 
         <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
           <p className="text-xs text-amber-700">
-            혼인 기간 7년 이내이면 신혼부부 특별공급 신청이 가능합니다.
-            정확한 자격은 공고문을 확인하세요.
+            정확한 특별공급 자격은 공고문을 반드시 확인하세요.
           </p>
         </div>
       </div>
