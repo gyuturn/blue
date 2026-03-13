@@ -195,7 +195,21 @@ function ResultContent() {
             <SpecialBadge
               label="신혼부부 특별공급"
               eligible={specialSupply.newlyWed}
-              description="혼인 상태 (7년 이내 해당 가능)"
+              description={
+                !input.isMarried
+                  ? '미혼'
+                  : !input.marriageDate
+                  ? '혼인 날짜 미입력'
+                  : (() => {
+                      const [y, m] = input.marriageDate.split('-').map(Number);
+                      const diffMs = new Date().getTime() - new Date(y, m - 1, 1).getTime();
+                      const totalMonths = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 30.44));
+                      const years = Math.floor(totalMonths / 12);
+                      const months = totalMonths % 12;
+                      const label = years > 0 ? `혼인 ${years}년 ${months > 0 ? `${months}개월` : ''}`.trim() : `혼인 ${months}개월`;
+                      return specialSupply.newlyWed ? `${label} → 자격 있음` : `${label} → 7년 초과`;
+                    })()
+              }
             />
             <SpecialBadge
               label="생애최초 특별공급"
@@ -205,7 +219,7 @@ function ResultContent() {
             <SpecialBadge
               label="다자녀 특별공급"
               eligible={specialSupply.multiChild}
-              description="미성년 자녀 3명 이상 (간략 판정)"
+              description={`미성년 자녀 ${input.childrenCount ?? 0}명${specialSupply.multiChild ? ' → 자격 있음' : ' (3명 이상 필요)'}`}
             />
           </div>
           <p className="text-xs text-gray-400 mt-3">

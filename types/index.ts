@@ -17,6 +17,8 @@ export interface EligibilityInput {
 
   // 혼인/자녀
   isMarried: boolean;
+  marriageDate: string;    // YYYY-MM, 기혼일 때만 유효
+  childrenCount: number;   // 미성년(만 19세 미만) 자녀 수
   hasRecentChild: boolean; // 최근 2년 내 자녀 출산
 }
 
