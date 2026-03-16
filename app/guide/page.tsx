@@ -1,195 +1,426 @@
-import Link from 'next/link';
 import type { Metadata } from 'next';
-import { Accordion } from '@/components/ui/Accordion';
+import Link from 'next/link';
+import { TERMS } from '@/lib/terms';
+import GuideAccordion from '@/components/GuideAccordion';
+import type { FAQItem } from '@/components/GuideAccordion';
 
 export const metadata: Metadata = {
-  title: '청약 입문 가이드 | 청약블루',
-  description: '청약이란 무엇인지, 어떻게 신청하는지 처음부터 알기 쉽게 안내합니다.',
+  title: '청약 완전 정복 가이드 | 청약 매칭 가이드',
+  description: '청약 입문자를 위한 쉬운 청약 개념 정리와 절차 안내',
 };
 
-const GLOSSARY = [
-  { term: '무주택', definition: '세대원 전원이 현재 주택을 소유하지 않은 상태. 청약 가점의 핵심 기준이며 무주택 기간이 길수록 높은 점수를 받습니다.' },
-  { term: '부양가족', definition: '주민등록상 같은 세대에 등록된 배우자, 직계존속(부모·조부모), 직계비속(자녀·손자녀). 부양가족이 많을수록 가점이 높아집니다.' },
-  { term: '가점제', definition: '무주택기간·부양가족 수·청약통장 가입기간의 점수 합산으로 당첨자를 선정하는 방식. 주로 전용면적 85㎡ 이하 민영주택에 적용됩니다.' },
-  { term: '추첨제', definition: '가점과 무관하게 무작위 추첨으로 당첨자를 선정하는 방식. 가점이 낮아도 당첨 기회가 있습니다.' },
-  { term: '전용면적', definition: '실제 거주에 사용되는 전용 공간의 면적. 베란다·복도·계단 등 공용 공간은 제외됩니다. 아파트 크기 표기의 기준이 됩니다.' },
-  { term: '공급면적', definition: '전용면적에 주거공용면적(계단·복도·엘리베이터 등)을 더한 면적. 옛 표기인 "평수"의 기준이 됩니다.' },
-  { term: '분양가', definition: '청약 당첨 시 해당 주택을 구입하기 위해 납부해야 하는 공급 가격. 주변 시세 대비 저렴한 경우가 많아 청약의 핵심 장점입니다.' },
-  { term: '청약가점', definition: '무주택기간(최대 32점), 부양가족 수(최대 35점), 청약통장 가입기간(최대 17점)을 합산한 점수. 만점은 84점입니다.' },
-  { term: '특별공급', definition: '신혼부부·생애최초·다자녀 등 정책적 배려가 필요한 계층에게 일반 청약과 별도로 물량을 공급하는 제도.' },
-  { term: '일반공급', definition: '특별공급을 제외한 일반 청약자를 대상으로 가점제 또는 추첨제로 당첨자를 선정하는 공급 방식.' },
-];
-
-const SPECIAL_SUPPLY_TYPES = [
+const FAQ_ITEMS: FAQItem[] = [
   {
-    type: '신혼부부',
-    color: 'bg-pink-50 border-pink-200',
-    badge: 'bg-pink-100 text-pink-700',
-    qualifications: ['혼인 후 7년 이내', '무주택 세대구성원', '소득 기준 충족'],
+    q: '청약통장은 어디서 만들 수 있나요?',
+    a: '전국 모든 시중 은행(국민, 신한, 우리, 하나 등)에서 개설할 수 있습니다. 주택청약종합저축 계좌를 개설하면 되며, 만 19세 이상이면 누구나 가입 가능합니다. 미성년자(만 17세 이상)도 청약 저축에 가입할 수 있습니다.',
   },
   {
-    type: '생애최초',
-    color: 'bg-green-50 border-green-200',
-    badge: 'bg-green-100 text-green-700',
-    qualifications: ['생애 처음으로 주택 구입', '청약통장 납입 12회 이상', '근로자·자영업자(소득세 납부 이력)'],
+    q: '청약통장에 매달 얼마씩 넣어야 하나요?',
+    a: '월 2만 원~50만 원 사이에서 자유롭게 선택할 수 있습니다. 국민주택(공공분양)을 목표로 한다면 매월 10만 원씩 꾸준히 납입하는 것이 유리합니다. 민영주택은 납입 횟수보다 예치금 잔액이 중요하므로, 목표 금액만 채워두면 됩니다.',
   },
   {
-    type: '다자녀',
-    color: 'bg-purple-50 border-purple-200',
-    badge: 'bg-purple-100 text-purple-700',
-    qualifications: ['미성년 자녀 3명 이상', '무주택 세대구성원'],
+    q: '1순위와 2순위의 차이가 뭔가요?',
+    a: '1순위는 청약통장 가입 기간과 납입 횟수 조건을 충족한 사람이고, 2순위는 그 조건을 충족하지 못한 사람입니다. 1순위 중에서 먼저 당첨자를 뽑고, 미달 시에만 2순위에게 기회가 돌아갑니다. 경쟁이 치열한 단지는 사실상 1순위에서 마감됩니다.',
   },
   {
-    type: '노부모 부양',
-    color: 'bg-orange-50 border-orange-200',
-    badge: 'bg-orange-100 text-orange-700',
-    qualifications: ['만 65세 이상 직계존속 부양', '3년 이상 동일 세대 등록', '무주택 세대구성원'],
+    q: '특별공급과 일반공급 중 뭐가 더 유리한가요?',
+    a: '자격이 된다면 특별공급이 훨씬 유리합니다. 특별공급은 일반공급과 별도의 물량이 배정되어 경쟁률이 낮은 경우가 많습니다. 신혼부부, 생애최초, 다자녀 등 해당 조건을 충족하면 반드시 특별공급에 먼저 도전하세요.',
+  },
+  {
+    q: '가점이 낮으면 청약에 당첨될 수 없나요?',
+    a: '그렇지 않습니다. 전용면적 85m² 초과 주택은 추첨제로 선정되므로 가점이 낮아도 당첨될 수 있습니다. 또한 비규제지역에서는 85m² 이하 주택도 일정 비율을 추첨제로 배정합니다. 미달 단지를 노리는 것도 좋은 전략입니다.',
+  },
+  {
+    q: '청약에 당첨되면 바로 입주하나요?',
+    a: '아닙니다. 청약 당첨 후 계약을 체결하면, 보통 2~3년 뒤에 입주합니다. 그 사이에 계약금(분양가의 10~20%), 중도금(40~60%), 잔금(나머지)을 순차적으로 납부합니다. 중도금 대출을 활용하는 경우가 많습니다.',
+  },
+  {
+    q: '부적격 당첨이란 무엇인가요?',
+    a: '자격 요건을 갖추지 못한 상태에서 청약에 당첨된 경우를 말합니다. 부적격 판정을 받으면 당첨이 취소되고, 향후 일정 기간(보통 1년) 동안 청약 신청이 제한됩니다. 반드시 모집공고의 자격 요건을 꼼꼼히 확인하세요.',
+  },
+  {
+    q: '청약 당첨 후 포기하면 어떤 불이익이 있나요?',
+    a: '당첨 후 계약을 포기하면 재당첨 제한(투기과열지구 10년, 조정대상지역 7년, 그 외 지역 없음)이 적용될 수 있습니다. 다만, 계약 체결 전에 포기하는 경우와 후에 포기하는 경우에 따라 제한 기간이 달라질 수 있으니 공고문을 확인하세요.',
   },
 ];
 
 export default function GuidePage() {
   return (
-    <main className="min-h-screen bg-gray-50">
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        {/* 헤더 */}
-        <div className="mb-8">
-          <Link href="/" className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm mb-4">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            홈으로
-          </Link>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center flex-shrink-0">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-              </svg>
+    <main className="min-h-screen bg-gradient-to-b from-blue-50 via-white to-gray-50">
+      {/* Hero Section */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-blue-600 to-blue-800 text-white">
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-10 left-10 w-40 h-40 bg-white rounded-full blur-3xl" />
+          <div className="absolute bottom-10 right-10 w-60 h-60 bg-blue-300 rounded-full blur-3xl" />
+        </div>
+        <div className="relative max-w-3xl mx-auto px-4 py-16 text-center">
+          <p className="text-blue-200 text-sm font-medium mb-3">
+            청약 매칭 가이드
+          </p>
+          <h1 className="text-3xl md:text-4xl font-black mb-4">
+            청약, 처음이세요?
+          </h1>
+          <p className="text-blue-100 text-base md:text-lg leading-relaxed max-w-xl mx-auto mb-8">
+            복잡하게만 느껴지는 청약, 이 가이드 하나면 충분합니다.
+            <br />
+            용어부터 절차까지, 쉽고 빠르게 이해해 보세요.
+          </p>
+          <div className="flex flex-wrap justify-center gap-4">
+            <div className="bg-white/15 backdrop-blur rounded-xl px-5 py-3 text-center">
+              <p className="text-2xl font-black">84점</p>
+              <p className="text-xs text-blue-200 mt-1">가점제 만점</p>
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">청약 입문 가이드</h1>
-              <p className="text-sm text-gray-500">청약을 처음 접하는 분들을 위한 기초 안내</p>
+            <div className="bg-white/15 backdrop-blur rounded-xl px-5 py-3 text-center">
+              <p className="text-2xl font-black">6종</p>
+              <p className="text-xs text-blue-200 mt-1">특별공급 유형</p>
+            </div>
+            <div className="bg-white/15 backdrop-blur rounded-xl px-5 py-3 text-center">
+              <p className="text-2xl font-black">5단계</p>
+              <p className="text-xs text-blue-200 mt-1">청약 절차</p>
             </div>
           </div>
         </div>
+      </section>
 
-        {/* 섹션 1: 청약이란? */}
-        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-4">
-          <h2 className="text-lg font-bold text-gray-900 mb-3">📌 청약이란?</h2>
-          <p className="text-sm text-gray-700 leading-relaxed mb-3">
-            청약이란 새로 짓는 아파트를 분양받기 위해 사전 신청하는 제도입니다. 정부·건설사가 공급하는 주택을 시세보다 저렴하게 구입할 수 있어, 내 집 마련의 가장 보편적인 방법으로 꼽힙니다.
-          </p>
-          <p className="text-sm text-gray-700 leading-relaxed">
-            당첨은 가점(무주택기간, 부양가족, 청약통장 납입기간)이나 추첨으로 결정됩니다. 청약통장을 일찍 만들고 꾸준히 납입할수록 유리합니다.
-          </p>
-        </section>
-
-        {/* 섹션 2: 청약통장 종류 */}
-        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-4">
-          <h2 className="text-lg font-bold text-gray-900 mb-4">🏦 청약통장 종류</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100">
-                  <th className="text-left font-semibold text-gray-700 pb-2 pr-4">종류</th>
-                  <th className="text-left font-semibold text-gray-700 pb-2 pr-4">가입 대상</th>
-                  <th className="text-left font-semibold text-gray-700 pb-2">특징</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                <tr>
-                  <td className="py-2.5 pr-4 font-medium text-blue-700">주택청약종합저축</td>
-                  <td className="py-2.5 pr-4 text-gray-600">누구나</td>
-                  <td className="py-2.5 text-gray-600">공공+민영 모두 청약 가능. 현재 주력 상품</td>
-                </tr>
-                <tr>
-                  <td className="py-2.5 pr-4 font-medium text-gray-600">청약저축</td>
-                  <td className="py-2.5 pr-4 text-gray-600">무주택 세대주</td>
-                  <td className="py-2.5 text-gray-500">공공주택 전용, 신규 가입 불가</td>
-                </tr>
-                <tr>
-                  <td className="py-2.5 pr-4 font-medium text-gray-600">청약예금·부금</td>
-                  <td className="py-2.5 pr-4 text-gray-600">누구나</td>
-                  <td className="py-2.5 text-gray-500">민영주택 전용, 신규 가입 불가</td>
-                </tr>
-              </tbody>
-            </table>
+      <div className="max-w-3xl mx-auto px-4 py-12 space-y-16">
+        {/* Section 1: 청약이란? */}
+        <section>
+          <SectionTitle number={1} title="청약이란?" />
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <p className="text-gray-700 leading-relaxed mb-6">
+              <strong>청약</strong>이란 새로 짓는 아파트(신축 분양)를 사전에 신청하여 구입하는 제도입니다.
+              쉽게 말해, <strong>&ldquo;새 아파트 추첨 응모&rdquo;</strong>라고 생각하시면 됩니다.
+              정부가 운영하는 공정한 시스템을 통해 누구나 내 집 마련의 기회를 얻을 수 있습니다.
+            </p>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="bg-blue-50 rounded-xl p-5">
+                <h4 className="font-bold text-blue-800 mb-2">국민주택 (공공분양)</h4>
+                <ul className="space-y-1.5 text-sm text-gray-600">
+                  <li>- 전용면적 85m² 이하</li>
+                  <li>- 국가·지자체·LH 등이 공급</li>
+                  <li>- 납입 횟수·가입 기간이 핵심</li>
+                  <li>- 상대적으로 저렴한 분양가</li>
+                </ul>
+              </div>
+              <div className="bg-purple-50 rounded-xl p-5">
+                <h4 className="font-bold text-purple-800 mb-2">민영주택 (민간분양)</h4>
+                <ul className="space-y-1.5 text-sm text-gray-600">
+                  <li>- 면적 제한 없음</li>
+                  <li>- 민간 건설사가 공급</li>
+                  <li>- 예치금(잔액)이 핵심</li>
+                  <li>- 가점제 or 추첨제로 선정</li>
+                </ul>
+              </div>
+            </div>
           </div>
-          <p className="text-xs text-gray-400 mt-3">* 지금 통장이 없다면 주택청약종합저축을 개설하세요.</p>
         </section>
 
-        {/* 섹션 3: 청약 신청 절차 */}
-        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-4">
-          <h2 className="text-lg font-bold text-gray-900 mb-4">📋 청약 신청 절차</h2>
-          <div className="space-y-3">
+        {/* Section 2: 청약 절차 */}
+        <section>
+          <SectionTitle number={2} title="청약 절차" />
+          <div className="space-y-4">
             {[
-              { step: 1, title: '청약통장 개설', desc: '주택청약종합저축에 가입하고 매달 꾸준히 납입합니다. 가입 기간과 납입 횟수가 가점에 반영됩니다.', color: 'bg-blue-600' },
-              { step: 2, title: '가점 확인', desc: '청약블루 계산기로 무주택기간·부양가족·통장 가입기간을 입력해 현재 가점을 확인합니다.', color: 'bg-blue-600' },
-              { step: 3, title: '공고 확인', desc: '청약홈(applyhome.co.kr)에서 관심 지역의 분양 공고를 확인하고 자격 요건을 검토합니다.', color: 'bg-blue-600' },
-              { step: 4, title: '청약 신청', desc: '청약홈 또는 해당 은행 앱에서 온라인으로 신청합니다. 공고문의 청약 일정을 반드시 확인하세요.', color: 'bg-blue-600' },
+              {
+                step: 1,
+                title: '청약통장 개설',
+                desc: '은행에서 주택청약종합저축 계좌를 개설하고 매월 납입을 시작합니다.',
+                color: 'bg-blue-500',
+              },
+              {
+                step: 2,
+                title: '자격 확인',
+                desc: '무주택 여부, 청약통장 가입 기간, 납입 횟수, 예치금 잔액 등을 확인합니다.',
+                color: 'bg-cyan-500',
+              },
+              {
+                step: 3,
+                title: '모집공고 확인',
+                desc: '청약홈에서 원하는 단지의 모집공고를 꼼꼼히 읽고 자격 요건을 체크합니다.',
+                color: 'bg-teal-500',
+              },
+              {
+                step: 4,
+                title: '청약 신청',
+                desc: '청약홈(applyhome.co.kr)에서 온라인으로 청약을 접수합니다.',
+                color: 'bg-green-500',
+              },
+              {
+                step: 5,
+                title: '당첨 발표 및 계약',
+                desc: '당첨자 발표 후 서류 제출, 자격 검증을 거쳐 분양 계약을 체결합니다.',
+                color: 'bg-emerald-500',
+              },
             ].map((item) => (
-              <div key={item.step} className="flex gap-4">
-                <div className={`flex-shrink-0 w-7 h-7 ${item.color} text-white rounded-full flex items-center justify-center text-xs font-bold`}>
+              <div
+                key={item.step}
+                className="flex gap-4 items-start bg-white rounded-2xl border border-gray-100 shadow-sm p-5"
+              >
+                <div
+                  className={`flex-shrink-0 w-10 h-10 ${item.color} text-white rounded-full flex items-center justify-center font-bold text-sm`}
+                >
                   {item.step}
                 </div>
                 <div>
-                  <p className="font-semibold text-gray-800 text-sm">{item.title}</p>
-                  <p className="text-gray-500 text-xs mt-0.5 leading-relaxed">{item.desc}</p>
+                  <h4 className="font-bold text-gray-900 mb-1">{item.title}</h4>
+                  <p className="text-sm text-gray-600">{item.desc}</p>
                 </div>
               </div>
             ))}
           </div>
         </section>
 
-        {/* 섹션 4: 특별공급 유형 */}
-        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-4">
-          <h2 className="text-lg font-bold text-gray-900 mb-4">⭐ 특별공급 유형</h2>
-          <p className="text-sm text-gray-500 mb-4">일반 청약보다 경쟁이 낮은 경우가 많습니다. 해당되는지 확인해 보세요.</p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {SPECIAL_SUPPLY_TYPES.map((item) => (
-              <div key={item.type} className={`rounded-xl border p-4 ${item.color}`}>
-                <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full mb-2 ${item.badge}`}>
-                  {item.type}
-                </span>
-                <ul className="space-y-1">
-                  {item.qualifications.map((q) => (
-                    <li key={q} className="text-xs text-gray-700 flex items-start gap-1.5">
-                      <span className="text-gray-400 mt-0.5 flex-shrink-0">•</span>
-                      {q}
-                    </li>
-                  ))}
-                </ul>
+        {/* Section 3: 자격 요건 */}
+        <section>
+          <SectionTitle number={3} title="자격 요건" />
+          <div className="grid md:grid-cols-3 gap-4">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+              <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center mb-3">
+                <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
+              </div>
+              <h4 className="font-bold text-gray-900 mb-2">무주택 조건</h4>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                본인과 세대 구성원 모두 주택을 소유하지 않아야 합니다. 무주택 기간이 길수록 가점이 높아집니다.
+              </p>
+            </div>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center mb-3">
+                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </div>
+              <h4 className="font-bold text-gray-900 mb-2">청약통장 조건</h4>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                청약통장 가입 기간(보통 1~2년), 납입 횟수(12~24회), 예치금 잔액 등의 조건을 충족해야 합니다.
+              </p>
+            </div>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+              <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center mb-3">
+                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </div>
+              <h4 className="font-bold text-gray-900 mb-2">거주지 조건</h4>
+              <p className="text-sm text-gray-600 leading-relaxed">
+                해당 주택 소재지 또는 인접 지역에 거주해야 합니다. 규제지역은 더 긴 거주 기간이 요구됩니다.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Section 4: 가점제 이해하기 */}
+        <section>
+          <SectionTitle number={4} title="가점제 이해하기" />
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <p className="text-gray-600 text-sm mb-6">
+              가점제는 총 <strong className="text-blue-700">84점 만점</strong>으로, 아래 3가지 항목의 점수를 합산하여 높은 순서대로 당첨자를 선정합니다.
+            </p>
+            <div className="space-y-4">
+              <ScoreCategory
+                title="무주택 기간"
+                maxPoints={32}
+                color="bg-red-500"
+                details="만 30세부터 산정, 1년 미만 2점 / 이후 1년당 2점씩 증가 / 15년 이상 최대 32점"
+              />
+              <ScoreCategory
+                title="부양가족 수"
+                maxPoints={35}
+                color="bg-blue-500"
+                details="0명 5점 / 1명 10점 / 2명 15점 / 3명 20점 / 4명 25점 / 5명 30점 / 6명 이상 35점"
+              />
+              <ScoreCategory
+                title="청약통장 가입 기간"
+                maxPoints={17}
+                color="bg-green-500"
+                details="6개월 미만 1점 / 이후 6개월당 1점씩 증가 / 15년 이상 최대 17점"
+              />
+            </div>
+            <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+              <p className="text-xs text-amber-700">
+                <strong>Tip:</strong> 부양가족 수(35점)가 가장 큰 비중을 차지합니다.
+                부양가족이 적다면 추첨제나 특별공급을 적극 활용하는 것이 전략적입니다.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Section 5: 특별공급 종류 */}
+        <section>
+          <SectionTitle number={5} title="특별공급 종류" />
+          <div className="grid md:grid-cols-2 gap-4">
+            <SpecialSupplyCard
+              title="신혼부부 특별공급"
+              emoji="heart"
+              color="bg-pink-50 border-pink-200"
+              headerColor="text-pink-700"
+              conditions={[
+                '혼인 기간 7년 이내',
+                '무주택 세대 구성원',
+                '소득 기준 충족 (도시근로자 평균 130% 이하)',
+                '자녀가 있으면 가점 우대',
+              ]}
+            />
+            <SpecialSupplyCard
+              title="생애최초 특별공급"
+              emoji="star"
+              color="bg-yellow-50 border-yellow-200"
+              headerColor="text-yellow-700"
+              conditions={[
+                '생애 최초 주택 구입자',
+                '5년 이상 소득세 납부',
+                '청약통장 납입 12회 이상',
+                '무주택 세대 구성원',
+              ]}
+            />
+            <SpecialSupplyCard
+              title="다자녀 특별공급"
+              emoji="family"
+              color="bg-green-50 border-green-200"
+              headerColor="text-green-700"
+              conditions={[
+                '미성년 자녀 3명 이상',
+                '무주택 세대 구성원',
+                '자녀 수에 따라 가점 부여',
+                '청약통장 6개월 이상 가입',
+              ]}
+            />
+            <SpecialSupplyCard
+              title="노부모부양 특별공급"
+              emoji="elder"
+              color="bg-indigo-50 border-indigo-200"
+              headerColor="text-indigo-700"
+              conditions={[
+                '만 65세 이상 직계존속 3년 이상 부양',
+                '무주택 세대주',
+                '피부양자와 같은 세대',
+                '가점제 상위자 우선 선정',
+              ]}
+            />
+          </div>
+        </section>
+
+        {/* Section 6: FAQ */}
+        <section>
+          <SectionTitle number={6} title="자주 묻는 질문" />
+          <GuideAccordion items={FAQ_ITEMS} />
+        </section>
+
+        {/* Section 7: 용어사전 */}
+        <section>
+          <SectionTitle number={7} title="청약 용어사전" />
+          <div className="grid sm:grid-cols-2 gap-3">
+            {TERMS.map((t) => (
+              <div
+                key={t.id}
+                className="bg-white rounded-xl border border-gray-100 shadow-sm p-4"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="font-bold text-gray-900 text-sm">{t.term}</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+                    {t.category}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-600 leading-relaxed">{t.fullDef}</p>
               </div>
             ))}
           </div>
         </section>
 
-        {/* 섹션 5: 주요 용어 사전 */}
-        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-1">📖 주요 용어 사전</h2>
-          <p className="text-sm text-gray-500 mb-4">용어를 클릭하면 설명을 볼 수 있습니다.</p>
-          <Accordion items={GLOSSARY} />
+        {/* CTA */}
+        <section className="text-center py-8">
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-8 text-white">
+            <h2 className="text-xl font-bold mb-2">이제 직접 확인해 볼까요?</h2>
+            <p className="text-blue-100 text-sm mb-6">
+              내 상황에 맞는 청약 가점과 자격을 바로 계산해 보세요
+            </p>
+            <div className="flex flex-wrap justify-center gap-3">
+              <Link
+                href="/calculator"
+                className="inline-block px-6 py-3 bg-white text-blue-700 font-semibold rounded-xl hover:bg-blue-50 transition-colors shadow-md"
+              >
+                가점 계산하기
+              </Link>
+              <Link
+                href="/announcements"
+                className="inline-block px-6 py-3 bg-blue-500 text-white font-semibold rounded-xl hover:bg-blue-400 transition-colors border border-blue-400"
+              >
+                공고 보러 가기
+              </Link>
+            </div>
+          </div>
         </section>
-
-        {/* 하단 CTA */}
-        <div className="space-y-3 mb-6">
-          <Link
-            href="/calculator"
-            className="block w-full text-center py-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-md transition-colors"
-          >
-            내 청약 가점 계산하기 →
-          </Link>
-          <Link
-            href="/announcements"
-            className="block w-full text-center py-3.5 bg-white hover:bg-gray-50 text-blue-600 font-semibold rounded-xl shadow-sm border border-blue-200 transition-colors"
-          >
-            청약 공고 보기
-          </Link>
-        </div>
-
-        <p className="text-xs text-gray-400 text-center">
-          본 가이드는 참고용이며 정확한 자격 요건은 공고문을 확인하세요.
-        </p>
       </div>
     </main>
+  );
+}
+
+function SectionTitle({ number, title }: { number: number; title: string }) {
+  return (
+    <div className="flex items-center gap-3 mb-6">
+      <span className="flex-shrink-0 w-8 h-8 bg-blue-600 text-white rounded-lg flex items-center justify-center text-sm font-bold">
+        {number}
+      </span>
+      <h2 className="text-xl font-bold text-gray-900">{title}</h2>
+    </div>
+  );
+}
+
+function ScoreCategory({
+  title,
+  maxPoints,
+  color,
+  details,
+}: {
+  title: string;
+  maxPoints: number;
+  color: string;
+  details: string;
+}) {
+  const percentage = (maxPoints / 84) * 100;
+  return (
+    <div className="bg-gray-50 rounded-xl p-4">
+      <div className="flex items-center justify-between mb-2">
+        <span className="font-semibold text-gray-800 text-sm">{title}</span>
+        <span className="text-sm font-bold text-blue-600">최대 {maxPoints}점</span>
+      </div>
+      <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2">
+        <div
+          className={`h-2.5 rounded-full ${color}`}
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
+      <p className="text-xs text-gray-500">{details}</p>
+    </div>
+  );
+}
+
+function SpecialSupplyCard({
+  title,
+  color,
+  headerColor,
+  conditions,
+}: {
+  title: string;
+  emoji: string;
+  color: string;
+  headerColor: string;
+  conditions: string[];
+}) {
+  return (
+    <div className={`rounded-2xl border p-5 ${color}`}>
+      <h4 className={`font-bold mb-3 ${headerColor}`}>{title}</h4>
+      <ul className="space-y-1.5">
+        {conditions.map((c, i) => (
+          <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
+            <svg className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            {c}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

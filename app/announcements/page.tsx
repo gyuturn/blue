@@ -167,7 +167,7 @@ export default function AnnouncementsPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">청약 공고</h1>
-              <p className="text-gray-500 text-sm mt-1">최신 청약 공고를 확인하세요</p>
+              <p className="text-gray-500 text-sm mt-1">최신 <Tooltip term={TERM_MAP.gonggoPyo.term} definition={TERM_MAP.gonggoPyo.shortDef}>모집공고</Tooltip>를 확인하세요</p>
             </div>
             {!loading && (
               isMock ? (
@@ -506,7 +506,7 @@ function AnnouncementCard({
                 d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
               />
             </svg>
-            공고문 바로가기 (청약홈)
+            공고문 바로가기 (<Tooltip term={TERM_MAP.cheongYangHome.term} definition={TERM_MAP.cheongYangHome.shortDef}>청약홈</Tooltip>)
           </a>
         </div>
       )}

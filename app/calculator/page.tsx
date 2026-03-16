@@ -629,7 +629,7 @@ function Step5({
         </Tooltip>
       </h2>
       <p className="text-gray-500 text-sm mb-5">
-        특별공급 자격 판정에 사용됩니다.
+        <Tooltip term={TERM_MAP.teukbyeol.term} definition={TERM_MAP.teukbyeol.shortDef}>특별공급</Tooltip> 자격 판정에 사용됩니다.
       </p>
 
       <div className="space-y-4">
