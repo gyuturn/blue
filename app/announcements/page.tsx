@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Disclaimer from '@/components/Disclaimer';
 import type { Announcement, StoredScoreData } from '@/types';
-import { getDday, getScoreTierLabel, getGeneralSupplyLabel, getSpecialSupplyLabels } from '@/lib/announcements';
+import { getDday, getDdayBadgeStyle, getScoreTierLabel, getGeneralSupplyLabel, getSpecialSupplyLabels } from '@/lib/announcements';
 
 const REGION_OPTIONS = [
   '전체',
@@ -280,6 +280,7 @@ function StatusBadge({ status }: { status: string | undefined }) {
 function AnnouncementCard({ announcement, scoreData }: { announcement: Announcement; scoreData: StoredScoreData | null }) {
   const router = useRouter();
   const dday = getDday(announcement.subscriptionStartDate, announcement.subscriptionEndDate);
+  const ddayBadge = getDdayBadgeStyle(dday);
 
   const handleCardClick = () => {
     try {
@@ -287,12 +288,6 @@ function AnnouncementCard({ announcement, scoreData }: { announcement: Announcem
     } catch {}
     router.push(`/announcements/${announcement.id}`);
   };
-  const ddayStyle =
-    announcement.status === '접수중'
-      ? 'text-green-600 font-bold'
-      : announcement.status === '접수예정'
-      ? 'text-blue-600 font-bold'
-      : 'text-gray-400';
 
   const tierLabel = scoreData ? getScoreTierLabel(scoreData.result.tier) : null;
   const generalSupply = scoreData ? getGeneralSupplyLabel(scoreData.input) : null;
@@ -308,7 +303,14 @@ function AnnouncementCard({ announcement, scoreData }: { announcement: Announcem
           <h3 className="font-bold text-gray-900 text-sm leading-snug flex-1">
             {announcement.complexName}
           </h3>
-          <StatusBadge status={announcement.status} />
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <StatusBadge status={announcement.status} />
+            {dday && dday !== '마감' && (
+              <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${ddayBadge.className}`}>
+                {ddayBadge.label}
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="space-y-1.5 text-xs text-gray-600">
@@ -337,9 +339,6 @@ function AnnouncementCard({ announcement, scoreData }: { announcement: Announcem
                 {announcement.subscriptionStartDate} ~{' '}
                 {announcement.subscriptionEndDate}
               </span>
-              {dday && (
-                <span className={`ml-auto text-xs ${ddayStyle}`}>{dday}</span>
-              )}
             </div>
           )}
         </div>
