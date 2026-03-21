@@ -33,6 +33,11 @@ export async function middleware(request: NextRequest) {
   const expiresAt = parseInt(expiresAtRaw, 10);
   const nowSeconds = Math.floor(Date.now() / 1000);
 
+  // 쿠키 값이 유효하지 않으면 (NaN) 비로그인으로 처리
+  if (isNaN(expiresAt)) {
+    return NextResponse.next();
+  }
+
   // 유효 (5분 이상 남음) — 통과
   if (expiresAt - nowSeconds > REFRESH_BUFFER_SECONDS) {
     return NextResponse.next();
