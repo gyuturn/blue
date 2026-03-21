@@ -4,7 +4,7 @@ import { use, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Disclaimer from '@/components/Disclaimer';
 import type { Announcement, StoredScoreData } from '@/types';
-import { getDday, getScoreTierLabel, getGeneralSupplyLabel, getSpecialSupplyLabels } from '@/lib/announcements';
+import { getDday, getDdayBadgeStyle, getScoreTierLabel, getGeneralSupplyLabel, getSpecialSupplyLabels } from '@/lib/announcements';
 
 export default function AnnouncementDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -45,7 +45,8 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
   }
 
   const dday = getDday(announcement.subscriptionStartDate, announcement.subscriptionEndDate);
-  const ddayStyle =
+  const ddayBadge = getDdayBadgeStyle(dday);
+  const statusStyle =
     announcement.status === '접수중'
       ? 'bg-green-100 text-green-700'
       : announcement.status === '접수예정'
@@ -76,11 +77,18 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
             <h1 className="text-xl font-bold text-gray-900 leading-snug flex-1">
               {announcement.complexName}
             </h1>
-            {announcement.status && (
-              <span className={`text-xs px-2.5 py-1 rounded-full font-semibold flex-shrink-0 ${ddayStyle}`}>
-                {announcement.status}
-              </span>
-            )}
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {announcement.status && (
+                <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${statusStyle}`}>
+                  {announcement.status}
+                </span>
+              )}
+              {dday && dday !== '마감' && (
+                <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${ddayBadge.className}`}>
+                  {ddayBadge.label}
+                </span>
+              )}
+            </div>
           </div>
           <p className="text-sm text-gray-500">
             {announcement.builder} · {announcement.region} · {announcement.houseType}
@@ -108,9 +116,9 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
                 <span className="text-gray-500">접수 마감</span>
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-gray-800">{announcement.subscriptionEndDate}</span>
-                  {dday && (
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${ddayStyle}`}>
-                      {dday}
+                  {dday && dday !== '마감' && (
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${ddayBadge.className}`}>
+                      {ddayBadge.label}
                     </span>
                   )}
                 </div>
