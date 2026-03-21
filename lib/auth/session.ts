@@ -1,17 +1,41 @@
 import { cookies } from 'next/headers';
-import type { SessionUser } from '@/types/auth';
+import type { SessionUser, TokenData } from '@/types/auth';
 
 const SESSION_COOKIE = 'blue_session';
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7일
+const ACCESS_TOKEN_COOKIE = 'blue_access_token';
+const REFRESH_TOKEN_COOKIE = 'blue_refresh_token';
+const EXPIRES_AT_COOKIE = 'blue_token_expires_at';
 
-export async function setSession(user: SessionUser): Promise<void> {
+const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7일
+
+const BASE_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax' as const,
+  path: '/',
+};
+
+export async function setSession(user: SessionUser, tokens: TokenData): Promise<void> {
   const cookieStore = await cookies();
+
   cookieStore.set(SESSION_COOKIE, JSON.stringify(user), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: COOKIE_MAX_AGE,
-    path: '/',
+    ...BASE_COOKIE_OPTIONS,
+    maxAge: SESSION_MAX_AGE,
+  });
+
+  cookieStore.set(ACCESS_TOKEN_COOKIE, tokens.accessToken, {
+    ...BASE_COOKIE_OPTIONS,
+    maxAge: Math.max(0, tokens.expiresAt - Math.floor(Date.now() / 1000)),
+  });
+
+  cookieStore.set(REFRESH_TOKEN_COOKIE, tokens.refreshToken, {
+    ...BASE_COOKIE_OPTIONS,
+    maxAge: SESSION_MAX_AGE,
+  });
+
+  cookieStore.set(EXPIRES_AT_COOKIE, String(tokens.expiresAt), {
+    ...BASE_COOKIE_OPTIONS,
+    maxAge: SESSION_MAX_AGE,
   });
 }
 
@@ -29,4 +53,7 @@ export async function getSession(): Promise<SessionUser | null> {
 export async function clearSession(): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.delete(SESSION_COOKIE);
+  cookieStore.delete(ACCESS_TOKEN_COOKIE);
+  cookieStore.delete(REFRESH_TOKEN_COOKIE);
+  cookieStore.delete(EXPIRES_AT_COOKIE);
 }
