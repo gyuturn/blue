@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Suspense } from 'react';
 import Disclaimer from '@/components/Disclaimer';
-import { calculateTotalScore, calculateSpecialSupply } from '@/lib/calculator';
+import { calculateTotalScore, calculateSpecialSupply, getHomelessNextMilestone, getSubscriptionNextMilestone } from '@/lib/calculator';
 import type { EligibilityInput, StoredScoreData } from '@/types';
 
 function ResultContent() {
@@ -53,7 +53,18 @@ function ResultContent() {
     );
   }
 
+  const [showTable, setShowTable] = useState(false);
+
   const { scoreResult, specialSupply, input } = data;
+
+  const homelessMilestone = input.isHomeless
+    ? getHomelessNextMilestone(input.homelessYears)
+    : null;
+  const subscriptionMilestone = getSubscriptionNextMilestone(input.subscriptionStartDate);
+  const maxAdditional =
+    (32 - scoreResult.homelessScore) +
+    (35 - scoreResult.dependentsScore) +
+    (17 - scoreResult.subscriptionScore);
 
   const tierConfig = {
     S: { color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'border-yellow-300', label: 'S등급', emoji: '최우수' },
@@ -184,6 +195,175 @@ function ResultContent() {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Score Improvement Guide */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-bold text-gray-900">점수 향상 가이드</h2>
+            {maxAdditional > 0 && (
+              <span className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded-full font-semibold">
+                최대 +{maxAdditional}점 가능
+              </span>
+            )}
+          </div>
+          <div className="space-y-3">
+            {/* 무주택 기간 */}
+            <div className="p-3 rounded-xl bg-gray-50 border border-gray-100">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm font-semibold text-gray-700">무주택 기간</span>
+                <span className="text-xs text-gray-500">{scoreResult.homelessScore} / 32점</span>
+              </div>
+              {!input.isHomeless ? (
+                <p className="text-xs text-gray-400">무주택자가 아니면 해당 없음 (0점)</p>
+              ) : scoreResult.homelessScore >= 32 ? (
+                <p className="text-xs text-green-600 font-semibold">최대 점수 달성!</p>
+              ) : homelessMilestone ? (
+                <p className="text-xs text-blue-600">
+                  무주택 <span className="font-bold">{Math.ceil(homelessMilestone.neededYears * 12)}개월</span> 더 유지 시
+                  {' '}<span className="font-bold text-blue-700">+{homelessMilestone.gainScore}점</span>
+                  {' → '}{homelessMilestone.nextScore}점
+                </p>
+              ) : null}
+              <p className="text-xs text-gray-400 mt-0.5">남은 잠재: +{32 - scoreResult.homelessScore}점</p>
+            </div>
+
+            {/* 부양가족 */}
+            <div className="p-3 rounded-xl bg-gray-50 border border-gray-100">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm font-semibold text-gray-700">부양가족 수</span>
+                <span className="text-xs text-gray-500">{scoreResult.dependentsScore} / 35점</span>
+              </div>
+              {scoreResult.dependentsScore >= 35 ? (
+                <p className="text-xs text-green-600 font-semibold">최대 점수 달성!</p>
+              ) : (
+                <p className="text-xs text-blue-600">
+                  부양가족 1명 추가 시{' '}
+                  <span className="font-bold text-blue-700">+5점</span>
+                  {' → '}{scoreResult.dependentsScore + 5}점
+                </p>
+              )}
+              <p className="text-xs text-gray-400 mt-0.5">남은 잠재: +{35 - scoreResult.dependentsScore}점</p>
+            </div>
+
+            {/* 청약통장 */}
+            <div className="p-3 rounded-xl bg-gray-50 border border-gray-100">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm font-semibold text-gray-700">청약통장 가입기간</span>
+                <span className="text-xs text-gray-500">{scoreResult.subscriptionScore} / 17점</span>
+              </div>
+              {scoreResult.subscriptionScore >= 17 ? (
+                <p className="text-xs text-green-600 font-semibold">최대 점수 달성!</p>
+              ) : subscriptionMilestone ? (
+                <p className="text-xs text-blue-600">
+                  <span className="font-bold">{subscriptionMilestone.nextDateLabel}</span>까지 유지 시
+                  {' '}<span className="font-bold text-blue-700">+{subscriptionMilestone.gainScore}점</span>
+                  {' → '}{subscriptionMilestone.nextScore}점
+                  <span className="text-gray-400"> ({subscriptionMilestone.monthsLeft}개월 후)</span>
+                </p>
+              ) : null}
+              <p className="text-xs text-gray-400 mt-0.5">남은 잠재: +{17 - scoreResult.subscriptionScore}점</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Scoring Reference Table */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 mb-4 overflow-hidden">
+          <button
+            onClick={() => setShowTable(!showTable)}
+            className="w-full flex items-center justify-between px-5 py-4 text-left"
+          >
+            <span className="text-base font-bold text-gray-900">배점 기준표</span>
+            <svg
+              className={`w-4 h-4 text-gray-400 transition-transform ${showTable ? 'rotate-180' : ''}`}
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {showTable && (
+            <div className="px-5 pb-5 space-y-4 border-t border-gray-50 pt-4">
+              {/* 무주택 기간 */}
+              <div>
+                <p className="text-xs font-bold text-gray-500 mb-2">무주택 기간 (최대 32점)</p>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-gray-400">
+                      <th className="text-left pb-1 font-medium">기간</th>
+                      <th className="text-right pb-1 font-medium">점수</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      ['1년 미만', 2], ['1년', 2], ['2년', 4], ['3년', 6], ['4년', 8],
+                      ['5년', 10], ['6년', 12], ['7년', 14], ['8년', 16], ['9년', 18],
+                      ['10년', 20], ['11년', 22], ['12년', 24], ['13년', 26], ['14년', 28],
+                      ['15년', 30], ['16년 이상', 32],
+                    ].map(([label, score]) => {
+                      const isCurrentRow = input.isHomeless && scoreResult.homelessScore === score;
+                      return (
+                        <tr key={label} className={isCurrentRow ? 'bg-blue-50 rounded' : ''}>
+                          <td className={`py-0.5 ${isCurrentRow ? 'text-blue-700 font-bold pl-1' : 'text-gray-600'}`}>{label}</td>
+                          <td className={`text-right ${isCurrentRow ? 'text-blue-700 font-bold pr-1' : 'text-gray-600'}`}>{score}점</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {/* 부양가족 */}
+              <div>
+                <p className="text-xs font-bold text-gray-500 mb-2">부양가족 수 (최대 35점)</p>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-gray-400">
+                      <th className="text-left pb-1 font-medium">인원</th>
+                      <th className="text-right pb-1 font-medium">점수</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      ['0명', 5], ['1명', 10], ['2명', 15], ['3명', 20], ['4명', 25], ['5명', 30], ['6명 이상', 35],
+                    ].map(([label, score]) => {
+                      const isCurrentRow = scoreResult.dependentsScore === score;
+                      return (
+                        <tr key={label} className={isCurrentRow ? 'bg-blue-50 rounded' : ''}>
+                          <td className={`py-0.5 ${isCurrentRow ? 'text-blue-700 font-bold pl-1' : 'text-gray-600'}`}>{label}</td>
+                          <td className={`text-right ${isCurrentRow ? 'text-blue-700 font-bold pr-1' : 'text-gray-600'}`}>{score}점</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {/* 청약통장 */}
+              <div>
+                <p className="text-xs font-bold text-gray-500 mb-2">청약통장 가입기간 (최대 17점)</p>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-gray-400">
+                      <th className="text-left pb-1 font-medium">기간</th>
+                      <th className="text-right pb-1 font-medium">점수</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      ['1년 미만', 1], ['1년', 3], ['2년', 5], ['3년', 7], ['4년', 9],
+                      ['5년', 11], ['6년', 13], ['7년', 15], ['8년 이상', 17],
+                    ].map(([label, score]) => {
+                      const isCurrentRow = scoreResult.subscriptionScore === score;
+                      return (
+                        <tr key={label} className={isCurrentRow ? 'bg-blue-50 rounded' : ''}>
+                          <td className={`py-0.5 ${isCurrentRow ? 'text-blue-700 font-bold pl-1' : 'text-gray-600'}`}>{label}</td>
+                          <td className={`text-right ${isCurrentRow ? 'text-blue-700 font-bold pr-1' : 'text-gray-600'}`}>{score}점</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Special Supply Eligibility */}

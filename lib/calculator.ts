@@ -102,6 +102,59 @@ export function calcMarriageYears(marriageDate: string): number {
 }
 
 /**
+ * 무주택 기간 다음 마일스톤
+ * 다음 연도 도달 시 얻는 추가 점수와 필요 연수 반환
+ */
+export function getHomelessNextMilestone(
+  years: number,
+): { nextScore: number; gainScore: number; neededYears: number } | null {
+  const currentScore = calculateHomelessScore(years);
+  if (currentScore >= 32) return null;
+  const nextYears = Math.floor(years) + 1;
+  const nextScore = calculateHomelessScore(nextYears);
+  return {
+    nextScore,
+    gainScore: nextScore - currentScore,
+    neededYears: nextYears - years,
+  };
+}
+
+/**
+ * 청약통장 다음 마일스톤
+ * 다음 연도 도달 날짜 및 추가 점수 반환
+ */
+export function getSubscriptionNextMilestone(startDate: string): {
+  nextScore: number;
+  gainScore: number;
+  monthsLeft: number;
+  nextDateLabel: string;
+} | null {
+  const currentScore = calculateSubscriptionScore(startDate);
+  if (currentScore >= 17) return null;
+
+  const [year, month] = startDate.split('-').map(Number);
+  if (!year || !month) return null;
+
+  const start = new Date(year, month - 1, 1);
+  const now = new Date();
+  const yearsElapsed = (now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+  const nextYear = Math.floor(yearsElapsed) + 1;
+  const nextDate = new Date(start.getFullYear() + nextYear, start.getMonth(), 1);
+  const monthsLeft = Math.max(
+    1,
+    Math.ceil((nextDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30.44)),
+  );
+  const nextDateLabel = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`;
+
+  return {
+    nextScore: currentScore + 2,
+    gainScore: 2,
+    monthsLeft,
+    nextDateLabel,
+  };
+}
+
+/**
  * 특별공급 자격 판정
  * - 신혼부부: 기혼 + 혼인 7년 이내
  * - 생애최초: 무주택 + 청약통장 납입 12회 이상
