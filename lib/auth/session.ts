@@ -30,6 +30,7 @@ export async function setSession(user: SessionUser, tokens: TokenData): Promise<
 
   cookieStore.set(REFRESH_TOKEN_COOKIE, tokens.refreshToken, {
     ...BASE_COOKIE_OPTIONS,
+    sameSite: 'strict',
     maxAge: SESSION_MAX_AGE,
   });
 
