@@ -53,8 +53,8 @@ export async function getSession(): Promise<SessionUser | null> {
 
 export async function clearSession(): Promise<void> {
   const cookieStore = await cookies();
-  cookieStore.delete(SESSION_COOKIE);
-  cookieStore.delete(ACCESS_TOKEN_COOKIE);
-  cookieStore.delete(REFRESH_TOKEN_COOKIE);
-  cookieStore.delete(EXPIRES_AT_COOKIE);
+  cookieStore.delete({ name: SESSION_COOKIE, path: '/' });
+  cookieStore.delete({ name: ACCESS_TOKEN_COOKIE, path: '/' });
+  cookieStore.delete({ name: REFRESH_TOKEN_COOKIE, path: '/' });
+  cookieStore.delete({ name: EXPIRES_AT_COOKIE, path: '/' });
 }
