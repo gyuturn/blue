@@ -15,3 +15,16 @@ export interface SessionUser {
   nickname: string;
   profileImage: string;
 }
+
+export interface TokenData {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number; // Unix timestamp (초)
+}
+
+export interface KakaoTokenResponse {
+  access_token: string;
+  refresh_token?: string;       // 카카오는 rotation 시에만 포함
+  expires_in: number;
+  refresh_token_expires_in?: number;
+}
