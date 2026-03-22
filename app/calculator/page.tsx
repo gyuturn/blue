@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import StepIndicator from '@/components/StepIndicator';
 import Disclaimer from '@/components/Disclaimer';
+import { Tooltip } from '@/components/ui/Tooltip';
 import type { EligibilityInput } from '@/types';
 
 const REGIONS = [
@@ -184,7 +185,11 @@ function Step1({
 }) {
   return (
     <div>
-      <h2 className="text-lg font-bold text-gray-900 mb-1">무주택 여부</h2>
+      <h2 className="text-lg font-bold text-gray-900 mb-1">
+        <Tooltip content="세대원 전원이 현재 주택을 소유하지 않은 상태를 말합니다. 세대원 중 한 명이라도 주택을 소유하면 무주택자로 인정되지 않습니다.">
+          <span>무주택 여부 <span className="text-blue-400 text-base" aria-label="도움말">ⓘ</span></span>
+        </Tooltip>
+      </h2>
       <p className="text-gray-500 text-sm mb-5">
         현재 주택을 소유하고 있지 않으신가요?
       </p>
@@ -246,7 +251,9 @@ function Step1({
       {isHomeless && (
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-2">
-            무주택 기간
+            <Tooltip content="무주택 상태가 지속된 기간입니다. 최대 32점이며 16년 이상이면 만점입니다.">
+              <span>무주택 기간 <span className="text-blue-400" aria-label="도움말">ⓘ</span></span>
+            </Tooltip>
           </label>
           <div className="flex items-center gap-3">
             <input
@@ -296,7 +303,11 @@ function Step2({
 
   return (
     <div>
-      <h2 className="text-lg font-bold text-gray-900 mb-1">부양가족 수</h2>
+      <h2 className="text-lg font-bold text-gray-900 mb-1">
+        <Tooltip content="주민등록상 같은 세대에 등록된 배우자, 직계존속(부모·조부모), 직계비속(자녀·손자녀)을 포함합니다. 최대 35점이며 6명 이상이면 만점입니다.">
+          <span>부양가족 수 <span className="text-blue-400 text-base" aria-label="도움말">ⓘ</span></span>
+        </Tooltip>
+      </h2>
       <p className="text-gray-500 text-sm mb-5">
         배우자, 자녀, 직계존속(부모님 등) 모두 포함하여 입력하세요.
       </p>
@@ -393,7 +404,11 @@ function Step3({
 
   return (
     <div>
-      <h2 className="text-lg font-bold text-gray-900 mb-1">청약통장 정보</h2>
+      <h2 className="text-lg font-bold text-gray-900 mb-1">
+        <Tooltip content="주택청약종합저축 등 청약 신청을 위한 전용 통장입니다. 가입 기간과 납입 횟수가 가점에 반영됩니다.">
+          <span>청약통장 정보 <span className="text-blue-400 text-base" aria-label="도움말">ⓘ</span></span>
+        </Tooltip>
+      </h2>
       <p className="text-gray-500 text-sm mb-5">
         청약통장(주택청약종합저축) 가입 정보를 입력하세요.
       </p>
@@ -413,7 +428,9 @@ function Step3({
 
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-            납입 횟수
+            <Tooltip content="청약통장에 납입한 총 횟수입니다. 생애최초 특별공급은 12회 이상, 가점 만점(17점)은 24회 이상이 필요합니다.">
+              <span>납입 횟수 <span className="text-blue-400" aria-label="도움말">ⓘ</span></span>
+            </Tooltip>
           </label>
           <div className="relative">
             <input
@@ -443,7 +460,9 @@ function Step3({
 
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-            예치 금액
+            <Tooltip content="민영주택 청약 시 필요한 지역별 최소 예치 금액입니다. 서울 85㎡ 초과는 1,500만원 이상이 필요합니다.">
+              <span>예치 금액 <span className="text-blue-400" aria-label="도움말">ⓘ</span></span>
+            </Tooltip>
           </label>
           <div className="relative">
             <input
@@ -560,7 +579,11 @@ function Step5({
 
   return (
     <div>
-      <h2 className="text-lg font-bold text-gray-900 mb-1">혼인 및 자녀</h2>
+      <h2 className="text-lg font-bold text-gray-900 mb-1">
+        <Tooltip content="특별공급 자격 판정에 사용됩니다. 신혼부부·생애최초·다자녀 등 정책적 배려 계층에게 별도 물량을 공급하는 제도입니다.">
+          <span>혼인 및 자녀 <span className="text-blue-400 text-base" aria-label="도움말">ⓘ</span></span>
+        </Tooltip>
+      </h2>
       <p className="text-gray-500 text-sm mb-5">
         특별공급 자격 판정에 사용됩니다.
       </p>
@@ -568,7 +591,11 @@ function Step5({
       <div className="space-y-4">
         {/* 혼인 여부 */}
         <div>
-          <p className="text-sm font-semibold text-gray-700 mb-2">혼인 여부</p>
+          <p className="text-sm font-semibold text-gray-700 mb-2">
+            <Tooltip content="혼인 후 7년 이내이면 신혼부부 특별공급 자격이 생깁니다.">
+              <span>혼인 여부 <span className="text-blue-400" aria-label="도움말">ⓘ</span></span>
+            </Tooltip>
+          </p>
           <div className="flex gap-3">
             <button
               onClick={() => onChange('isMarried', true)}
@@ -616,7 +643,9 @@ function Step5({
         {/* 미성년 자녀 수 */}
         <div>
           <p className="text-sm font-semibold text-gray-700 mb-2">
-            미성년 자녀 수 <span className="font-normal text-gray-400">(만 19세 미만)</span>
+            <Tooltip content="만 19세 미만 자녀 수입니다. 3명 이상이면 다자녀 특별공급 자격이 생깁니다.">
+              <span>미성년 자녀 수 <span className="font-normal text-gray-400">(만 19세 미만)</span> <span className="text-blue-400" aria-label="도움말">ⓘ</span></span>
+            </Tooltip>
           </p>
           <div className="flex items-center gap-4">
             <button
