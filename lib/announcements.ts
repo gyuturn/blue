@@ -158,6 +158,17 @@ export async function fetchAnnouncementsFromAPI(region?: string): Promise<Announ
   }
 }
 
+// D-Day 배지 스타일 (마감 임박도에 따른 색상 분기)
+export function getDdayBadgeStyle(dday: string): { label: string; className: string } {
+  if (!dday || dday === '마감') return { label: '마감', className: 'bg-gray-100 text-gray-400' };
+  if (dday === 'D-day') return { label: 'D-day', className: 'bg-red-500 text-white' };
+
+  const days = parseInt(dday.replace('D-', ''), 10);
+  if (days <= 3) return { label: dday, className: 'bg-red-100 text-red-600 font-bold' };
+  if (days <= 7) return { label: dday, className: 'bg-orange-100 text-orange-600 font-bold' };
+  return { label: dday, className: 'bg-blue-100 text-blue-600' };
+}
+
 // 등급 기반 추천 라벨
 export function getScoreTierLabel(tier: 'S' | 'A' | 'B' | 'C'): { text: string; style: string } {
   if (tier === 'S' || tier === 'A') {
@@ -199,9 +210,9 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     complexName: '서울 강남 래미안 센트럴',
     builder: '삼성물산',
     region: '서울특별시',
-    announcementDate: '2026-02-10',
-    subscriptionStartDate: '2026-02-24',
-    subscriptionEndDate: '2026-02-26',
+    announcementDate: '2026-03-10',
+    subscriptionStartDate: '2026-03-22',
+    subscriptionEndDate: '2026-03-24',
     houseType: '민영주택',
     pdfUrl: 'https://www.applyhome.co.kr',
     totalHouseholds: 350,
@@ -212,9 +223,9 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     complexName: '경기 판교 힐스테이트',
     builder: '현대엔지니어링',
     region: '경기도',
-    announcementDate: '2026-02-12',
-    subscriptionStartDate: '2026-02-28',
-    subscriptionEndDate: '2026-03-04',
+    announcementDate: '2026-03-12',
+    subscriptionStartDate: '2026-03-21',
+    subscriptionEndDate: '2026-03-25',
     houseType: '민영주택',
     pdfUrl: 'https://www.applyhome.co.kr',
     totalHouseholds: 520,
@@ -225,9 +236,9 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     complexName: '부산 해운대 더샵 마리나',
     builder: '포스코이앤씨',
     region: '부산광역시',
-    announcementDate: '2026-02-14',
-    subscriptionStartDate: '2026-03-03',
-    subscriptionEndDate: '2026-03-05',
+    announcementDate: '2026-03-14',
+    subscriptionStartDate: '2026-03-21',
+    subscriptionEndDate: '2026-03-23',
     houseType: '민영주택',
     pdfUrl: 'https://www.applyhome.co.kr',
     totalHouseholds: 280,
@@ -238,9 +249,9 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     complexName: '인천 송도 자이 더 스타',
     builder: 'GS건설',
     region: '인천광역시',
-    announcementDate: '2026-02-17',
-    subscriptionStartDate: '2026-03-10',
-    subscriptionEndDate: '2026-03-12',
+    announcementDate: '2026-03-15',
+    subscriptionStartDate: '2026-03-26',
+    subscriptionEndDate: '2026-03-28',
     houseType: '민영주택',
     pdfUrl: 'https://www.applyhome.co.kr',
     totalHouseholds: 410,
@@ -251,9 +262,9 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     complexName: '대구 수성 e편한세상',
     builder: 'DL이앤씨',
     region: '대구광역시',
-    announcementDate: '2026-02-18',
-    subscriptionStartDate: '2026-03-17',
-    subscriptionEndDate: '2026-03-19',
+    announcementDate: '2026-03-16',
+    subscriptionStartDate: '2026-03-28',
+    subscriptionEndDate: '2026-03-30',
     houseType: '민영주택',
     pdfUrl: 'https://www.applyhome.co.kr',
     totalHouseholds: 195,
@@ -264,9 +275,9 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     complexName: '경기 의정부 한양수자인',
     builder: '한양',
     region: '경기도',
-    announcementDate: '2026-02-19',
-    subscriptionStartDate: '2026-03-24',
-    subscriptionEndDate: '2026-03-26',
+    announcementDate: '2026-03-17',
+    subscriptionStartDate: '2026-04-01',
+    subscriptionEndDate: '2026-04-03',
     houseType: '민영주택',
     pdfUrl: 'https://www.applyhome.co.kr',
     totalHouseholds: 320,
@@ -277,9 +288,9 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     complexName: '세종 행복도시 국민임대',
     builder: 'LH한국토지주택공사',
     region: '세종특별자치시',
-    announcementDate: '2026-02-20',
-    subscriptionStartDate: '2026-03-04',
-    subscriptionEndDate: '2026-03-06',
+    announcementDate: '2026-03-18',
+    subscriptionStartDate: '2026-04-07',
+    subscriptionEndDate: '2026-04-09',
     houseType: '공공임대',
     pdfUrl: 'https://www.applyhome.co.kr',
     totalHouseholds: 150,
@@ -290,9 +301,9 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     complexName: '광주 첨단 아이파크',
     builder: 'HDC현대산업개발',
     region: '광주광역시',
-    announcementDate: '2026-02-21',
-    subscriptionStartDate: '2026-03-18',
-    subscriptionEndDate: '2026-03-20',
+    announcementDate: '2026-03-19',
+    subscriptionStartDate: '2026-04-14',
+    subscriptionEndDate: '2026-04-16',
     houseType: '민영주택',
     pdfUrl: 'https://www.applyhome.co.kr',
     totalHouseholds: 240,

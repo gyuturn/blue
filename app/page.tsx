@@ -156,6 +156,12 @@ export default function HomePage() {
           >
             청약 공고 보기
           </Link>
+          <Link
+            href="/guide"
+            className="block w-full text-center py-3.5 bg-white hover:bg-gray-50 text-gray-600 font-semibold rounded-xl shadow-sm border border-gray-200 transition-colors duration-200"
+          >
+            청약 입문 가이드 보기
+          </Link>
         </div>
 
         <Disclaimer />

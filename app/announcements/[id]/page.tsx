@@ -4,7 +4,8 @@ import { use, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Disclaimer from '@/components/Disclaimer';
 import type { Announcement, StoredScoreData } from '@/types';
-import { getDday, getScoreTierLabel, getGeneralSupplyLabel, getSpecialSupplyLabels } from '@/lib/announcements';
+import { getDday, getDdayBadgeStyle, getScoreTierLabel, getGeneralSupplyLabel, getSpecialSupplyLabels } from '@/lib/announcements';
+import { Tooltip } from '@/components/ui/Tooltip';
 
 export default function AnnouncementDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -45,7 +46,8 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
   }
 
   const dday = getDday(announcement.subscriptionStartDate, announcement.subscriptionEndDate);
-  const ddayStyle =
+  const ddayBadge = getDdayBadgeStyle(dday);
+  const statusStyle =
     announcement.status === '접수중'
       ? 'bg-green-100 text-green-700'
       : announcement.status === '접수예정'
@@ -76,11 +78,18 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
             <h1 className="text-xl font-bold text-gray-900 leading-snug flex-1">
               {announcement.complexName}
             </h1>
-            {announcement.status && (
-              <span className={`text-xs px-2.5 py-1 rounded-full font-semibold flex-shrink-0 ${ddayStyle}`}>
-                {announcement.status}
-              </span>
-            )}
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {announcement.status && (
+                <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${statusStyle}`}>
+                  {announcement.status}
+                </span>
+              )}
+              {dday && dday !== '마감' && (
+                <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${ddayBadge.className}`}>
+                  {ddayBadge.label}
+                </span>
+              )}
+            </div>
           </div>
           <p className="text-sm text-gray-500">
             {announcement.builder} · {announcement.region} · {announcement.houseType}
@@ -108,9 +117,9 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
                 <span className="text-gray-500">접수 마감</span>
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-gray-800">{announcement.subscriptionEndDate}</span>
-                  {dday && (
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${ddayStyle}`}>
-                      {dday}
+                  {dday && dday !== '마감' && (
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${ddayBadge.className}`}>
+                      {ddayBadge.label}
                     </span>
                   )}
                 </div>
@@ -122,7 +131,12 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
         {/* 공급 정보 */}
         {announcement.totalHouseholds !== undefined && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
-            <h2 className="text-sm font-bold text-gray-700 mb-3">공급 정보</h2>
+            <div className="flex items-center gap-2 mb-3">
+              <h2 className="text-sm font-bold text-gray-700">공급 정보</h2>
+              <Tooltip content="전용면적: 실제 거주 공간의 면적(베란다 제외). 분양가: 청약 당첨 시 납부 금액. 상세 내용은 공고문을 확인하세요.">
+                <span className="text-blue-400 font-normal cursor-help text-xs" aria-label="도움말">전용면적·분양가 ⓘ</span>
+              </Tooltip>
+            </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-500">총 공급 세대수</span>
               <span className="font-bold text-gray-900">{announcement.totalHouseholds.toLocaleString()}세대</span>
@@ -133,7 +147,12 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
         {/* 내 청약 분석 */}
         {scoreData && hasMatchInfo && (
           <div className="bg-blue-50 rounded-2xl border border-blue-100 p-5 mb-4">
-            <h2 className="text-sm font-bold text-blue-800 mb-3">내 청약 분석</h2>
+            <div className="flex items-center gap-2 mb-3">
+              <h2 className="text-sm font-bold text-blue-800">내 청약 분석</h2>
+              <Tooltip content="가점제: 무주택기간·부양가족·청약통장 점수로 당첨자 선정. 추첨제: 가점 없이 무작위 추첨으로 선정.">
+                <span className="text-blue-400 font-normal text-xs cursor-help" aria-label="도움말">가점제·추첨제 ⓘ</span>
+              </Tooltip>
+            </div>
             <div className="flex flex-wrap gap-1.5">
               {tierLabel && (
                 <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${tierLabel.style}`}>

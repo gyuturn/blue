@@ -1,0 +1,181 @@
+# 툴팁 & 가이드 페이지 설계
+
+## 개요
+
+청약 초보자가 용어를 몰라도 서비스를 이해하고 사용할 수 있도록, 재사용 가능한 Tooltip 컴포넌트를 구현하고 계산기/공고 페이지에 적용한다. 아울러 청약 개념을 처음부터 설명하는 `/guide` 페이지를 신설한다.
+
+관련 이슈: #4(공통 Tooltip 컴포넌트), #18(가이드 페이지), #19(UX 개선)
+
+---
+
+## 변경 파일 목록
+
+| 파일 | 작업 |
+|------|------|
+| `components/ui/Tooltip.tsx` | 신규 — 재사용 Tooltip 클라이언트 컴포넌트 (`components/ui/` 디렉토리 신규 생성) |
+| `components/ui/Accordion.tsx` | 신규 — 가이드 페이지 용어 사전용 클라이언트 컴포넌트 |
+| `app/guide/page.tsx` | 신규 — 청약 입문 가이드 페이지 (서버 컴포넌트) |
+| `app/calculator/page.tsx` | 수정 — 주요 입력 필드에 툴팁 추가 |
+| `app/announcements/[id]/page.tsx` | 수정 — 공고 상세 용어(분양가, 전용면적 등)에 툴팁 추가 |
+| `app/page.tsx` | 수정 — 가이드 페이지 진입 버튼 추가 |
+| `components/layout/Header.tsx` | 수정 — 네비게이션에 "가이드" 링크 추가 |
+
+---
+
+## Tooltip 컴포넌트
+
+### 인터페이스
+
+```tsx
+interface TooltipProps {
+  content: React.ReactNode;  // 문자열 또는 JSX 허용 (향후 링크 포함 대비)
+  children: React.ReactNode;
+  position?: 'top'; // 현재는 'top'만 지원. bottom이 필요해지면 확장
+}
+
+export function Tooltip({ content, children, position = 'top' }: TooltipProps)
+```
+
+`tooltipId`는 React 18의 `useId()` 훅으로 생성한다. SSR 안전하고 hydration 불일치 없음:
+```tsx
+const tooltipId = useId();
+```
+
+### 동작
+
+- **데스크탑**: hover 시 툴팁 표시, hover 해제 시 숨김
+- **모바일**: tap 시 토글, 바깥 영역 클릭 시 닫힘
+- `useRef` (초기값 `null`) + `useEffect`로 외부 클릭 감지
+- `useEffect` cleanup에서 반드시 `document.removeEventListener` 호출하여 메모리 누수 방지
+
+### 위치 오버플로 처리
+
+- 기본 `position='top'`: 트리거 요소 위에 표시
+- 뷰포트 경계 처리: `whitespace-nowrap` 사용 금지, `max-w-[250px] w-max` 적용
+- 툴팁 컨테이너는 `relative`, 툴팁 박스는 `absolute`로 배치
+- 왼쪽 정렬 기준: `left-0` (트리거가 우측 끝에 있을 때도 뷰포트 밖으로 나가지 않도록 `min-w-0` 고려)
+
+### 접근성
+
+- 트리거 요소에 `aria-describedby={tooltipId}` 적용
+- 툴팁 컨테이너에 `role="tooltip"` + `id={tooltipId}` 적용
+- `ⓘ` 아이콘에 `aria-label="도움말"` 추가
+
+### 스타일
+
+- 어두운 배경(`bg-gray-800`), 흰 텍스트, 둥근 모서리(`rounded-lg`)
+- `max-w-[250px]`, `text-sm`, `p-2`
+- 말풍선 화살표: 작은 `div`에 `rotate-45 bg-gray-800` 적용
+- fade 전환: `transition-opacity duration-150`
+
+### 사용 예시
+
+```tsx
+<Tooltip content="세대원 전원이 주택을 소유하지 않은 기간">
+  <span className="cursor-help">
+    무주택기간 <span className="text-blue-500" aria-label="도움말">ⓘ</span>
+  </span>
+</Tooltip>
+```
+
+---
+
+## 가이드 페이지 (`/guide`)
+
+서버 컴포넌트로 구현하여 SEO를 고려한다. 외부 API 호출 없는 정적 콘텐츠 페이지.
+
+### 섹션 구성
+
+#### 1. 청약이란?
+- 청약의 개념을 2~3문장으로 소개
+- 청약의 장점(내 집 마련 수단, 시세 대비 저렴 등) 간략 언급
+
+#### 2. 청약통장 종류
+- 3가지 통장 비교표:
+
+| 종류 | 가입 대상 | 특징 |
+|------|----------|------|
+| 주택청약종합저축 | 누구나 | 공공+민영 모두 청약 가능, 현재 주력 상품 |
+| 청약저축 | 무주택 세대주 | 공공주택 전용, 신규 가입 불가 |
+| 청약예금·부금 | 누구나 | 민영주택 전용, 신규 가입 불가 |
+
+#### 3. 청약 신청 절차
+4단계 스텝 카드:
+1. 청약통장 개설 (가입 기간 & 납입 횟수 쌓기)
+2. 가점 확인 (청약블루 계산기 활용)
+3. 공고 확인 (청약홈에서 공고 탐색)
+4. 청약 신청 (청약홈 온라인 접수)
+
+#### 4. 특별공급 유형
+카드 형태로 4가지 유형 요약:
+
+| 유형 | 핵심 자격 |
+|------|----------|
+| 신혼부부 | 혼인 7년 이내, 무주택 |
+| 생애최초 | 생애 첫 주택 구입, 납입 12회 이상 |
+| 다자녀 | 미성년 자녀 3명 이상 |
+| 노부모 부양 | 만 65세 이상 직계존속 3년 이상 부양 |
+
+#### 5. 주요 용어 사전
+아코디언 UI로 10개 용어:
+- 무주택, 부양가족, 가점제, 추첨제, 전용면적, 공급면적, 분양가, 청약가점, 특별공급, 일반공급
+
+> **구현 노트**: 아코디언은 `useState`가 필요하므로 `components/ui/Accordion.tsx`를 `'use client'` 컴포넌트로 분리하여 구현한다. `app/guide/page.tsx`(서버 컴포넌트)에서 이 클라이언트 컴포넌트를 import하는 방식으로 부분 클라이언트 경계를 형성한다.
+
+### 하단 CTA
+계산기 바로가기 버튼 → `/calculator`
+
+---
+
+## 툴팁 적용 용어
+
+### 계산기 페이지 (`app/calculator/page.tsx`)
+
+| Step | 용어 | 설명 |
+|------|------|------|
+| Step 1 | 무주택 여부 | 세대원 전원이 현재 주택을 소유하지 않은 상태 |
+| Step 1 | 무주택기간 | 무주택 상태가 지속된 기간. 최대 32점 (16년 이상) |
+| Step 2 | 부양가족 | 주민등록상 같은 세대원 중 배우자, 직계존속·비속. 최대 35점 (6명 이상) |
+| Step 3 | 청약통장 | 주택청약종합저축 등 청약 신청을 위한 전용 통장 |
+| Step 3 | 납입횟수 | 매달 청약통장에 납입한 총 횟수. 24회 이상부터 만점 |
+| Step 3 | 예치금 | 민영주택 청약 시 필요한 지역별 최소 예치 금액 |
+| Step 5 | 특별공급 | 무주택 서민, 신혼부부 등 정책적 배려 계층을 위한 별도 공급 제도 |
+| Step 5 | 신혼부부 | 혼인 후 7년 이내 무주택 부부 대상 특별공급 |
+| Step 5 | 생애최초 | 생애 처음으로 주택을 구입하는 경우 적용되는 특별공급 |
+| Step 5 | 다자녀 | 미성년 자녀 3명 이상 가구 대상 특별공급 |
+
+### 공고 상세 페이지 (`app/announcements/[id]/page.tsx`)
+
+분양가, 전용면적 등의 용어는 목록 페이지(`app/announcements/page.tsx`)의 카드에는 노출되지 않고 **상세 페이지**에서 표시된다. 따라서 툴팁은 `[id]/page.tsx`에 적용한다.
+
+> **참고**: `app/announcements/page.tsx`는 공고 목록 카드(단지명, 지역, 접수기간 등)만 표시하므로 툴팁 적용 대상이 아님.
+
+> **구현 노트**: `[id]/page.tsx`는 sessionStorage에서 공고 데이터를 읽는 구조로, 데이터가 없을 경우 로딩/리다이렉트 처리가 먼저 실행된다. 툴팁 JSX는 반드시 null 체크 이후(`if (!announcement)` guard 통과 후)의 `return` 블록 안에서만 사용해야 한다.
+
+| 용어 | 설명 |
+|------|------|
+| 분양가 | 청약 당첨 시 납부해야 하는 해당 주택의 공급 가격 |
+| 전용면적 | 실제 거주 공간의 면적 (베란다·복도 제외). 아파트 크기 표기 기준 |
+| 공급면적 | 전용면적 + 주거공용면적 (계단·복도 등 포함) |
+| 가점제 | 무주택기간·부양가족·청약통장 가입기간 점수로 당첨자를 선정하는 방식 |
+| 추첨제 | 가점 없이 무작위 추첨으로 당첨자를 선정하는 방식 |
+
+---
+
+## 네비게이션 변경
+
+- `Header.tsx`: 기존 "공고" "계산기" 링크 옆에 "가이드" 링크 추가
+- `app/page.tsx`: 홈 페이지 feature 카드 섹션에 가이드 진입 카드 추가 (또는 별도 CTA 버튼)
+
+---
+
+## 기술 고려사항
+
+- `components/ui/Tooltip.tsx`: `'use client'` 클라이언트 컴포넌트
+- `components/ui/Accordion.tsx`: `'use client'` 클라이언트 컴포넌트 (가이드 페이지 용어 사전용)
+- `app/guide/page.tsx`: 서버 컴포넌트 — `Accordion`만 클라이언트 경계
+- 계산기 페이지는 이미 `'use client'`이므로 Tooltip 직접 import 가능
+- 공고 상세 페이지(`[id]/page.tsx`)도 `'use client'`이므로 동일하게 적용
+- Header는 서버 컴포넌트이므로 가이드 `<Link>` 태그만 추가 (Tooltip 불필요)
+- `app/announcements/page.tsx`(공고 목록)는 이번 작업 범위에서 제외 — 툴팁 적용 용어가 없음
+- `app/announcements/[id]/page.tsx`(공고 상세): sessionStorage에서 공고 데이터를 읽는 구조이므로, 계산기를 거친 사용자만 접근 가능 — 이는 기존 설계이며 이번 작업에서 변경하지 않음
