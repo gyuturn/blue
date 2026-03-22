@@ -1,16 +1,18 @@
 'use client';
 
 import { useState, useRef, useEffect, useId } from 'react';
+import type { ReactNode } from 'react';
 
 interface TooltipProps {
-  content: React.ReactNode;
-  children: React.ReactNode;
+  content: ReactNode;
+  children: ReactNode;
 }
 
 export function Tooltip({ content, children }: TooltipProps) {
   const [visible, setVisible] = useState(false);
   const containerRef = useRef<HTMLSpanElement>(null);
   const tooltipId = useId();
+  const lastPointerType = useRef<string>('');
 
   // visible일 때만 리스너 등록해 불필요한 전역 이벤트 방지
   useEffect(() => {
@@ -28,9 +30,11 @@ export function Tooltip({ content, children }: TooltipProps) {
     <span
       ref={containerRef}
       className="relative inline-flex items-center"
-      onPointerEnter={(e) => { if (e.pointerType === 'mouse') setVisible(true); }}
+      tabIndex={0}
+      onPointerEnter={(e) => { lastPointerType.current = e.pointerType; if (e.pointerType === 'mouse') setVisible(true); }}
       onPointerLeave={(e) => { if (e.pointerType === 'mouse') setVisible(false); }}
-      onClick={() => setVisible((v) => !v)}
+      onClick={() => { if (lastPointerType.current !== 'mouse') setVisible((v) => !v); }}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setVisible((v) => !v); } }}
       aria-describedby={visible ? tooltipId : undefined}
     >
       {children}
