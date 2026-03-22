@@ -30,10 +30,15 @@
 interface TooltipProps {
   content: React.ReactNode;  // 문자열 또는 JSX 허용 (향후 링크 포함 대비)
   children: React.ReactNode;
-  position?: 'top' | 'bottom'; // 기본값: 'top'
+  position?: 'top'; // 현재는 'top'만 지원. bottom이 필요해지면 확장
 }
 
 export function Tooltip({ content, children, position = 'top' }: TooltipProps)
+```
+
+`tooltipId`는 React 18의 `useId()` 훅으로 생성한다. SSR 안전하고 hydration 불일치 없음:
+```tsx
+const tooltipId = useId();
 ```
 
 ### 동작
@@ -144,6 +149,8 @@ export function Tooltip({ content, children, position = 'top' }: TooltipProps)
 분양가, 전용면적 등의 용어는 목록 페이지(`app/announcements/page.tsx`)의 카드에는 노출되지 않고 **상세 페이지**에서 표시된다. 따라서 툴팁은 `[id]/page.tsx`에 적용한다.
 
 > **참고**: `app/announcements/page.tsx`는 공고 목록 카드(단지명, 지역, 접수기간 등)만 표시하므로 툴팁 적용 대상이 아님.
+
+> **구현 노트**: `[id]/page.tsx`는 sessionStorage에서 공고 데이터를 읽는 구조로, 데이터가 없을 경우 로딩/리다이렉트 처리가 먼저 실행된다. 툴팁 JSX는 반드시 null 체크 이후(`if (!announcement)` guard 통과 후)의 `return` 블록 안에서만 사용해야 한다.
 
 | 용어 | 설명 |
 |------|------|
