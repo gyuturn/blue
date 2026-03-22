@@ -85,30 +85,31 @@ export async function fetchAnnouncementsFromAPI(region?: string): Promise<Announ
     return [];
   }
 
+  console.log('[API] KEY exists:', !!apiKey, 'length:', apiKey?.length);
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 5000);
 
   try {
     const baseUrl =
       'https://api.odcloud.kr/api/ApplyhomeInfoDetailSvc/v1/getAPTLttotPblancDetail';
-    const params = new URLSearchParams({
-      page: '1',
-      perPage: '20',
-      serviceKey: apiKey,
-      returnType: 'JSON',
-    });
+
+    // serviceKey는 URL 인코딩된 원본 값을 그대로 사용 (URLSearchParams 이중 인코딩 방지)
+    let queryString = `page=1&perPage=20&returnType=JSON&serviceKey=${apiKey}`;
 
     if (region) {
       const resolvedRegion = resolveRegionParam(region);
-      params.append('cond[SUBSCRPT_AREA_CODE_NM::EQ]', resolvedRegion);
+      queryString += `&cond[SUBSCRPT_AREA_CODE_NM::EQ]=${encodeURIComponent(resolvedRegion)}`;
     }
 
-    const response = await fetch(`${baseUrl}?${params.toString()}`, {
+    const response = await fetch(`${baseUrl}?${queryString}`, {
       signal: controller.signal,
-      next: { revalidate: 3600 },
+      cache: 'no-store',
     });
 
     clearTimeout(timeoutId);
+
+    console.log('[API] Response status:', response.status);
 
     if (response.status === 429) {
       console.error('[API] Rate limit exceeded');
@@ -116,11 +117,13 @@ export async function fetchAnnouncementsFromAPI(region?: string): Promise<Announ
     }
 
     if (!response.ok) {
-      console.error(`[API] Error: ${response.status} ${response.statusText}`);
+      const text = await response.text();
+      console.error(`[API] Error: ${response.status} ${response.statusText}`, text.slice(0, 200));
       return [];
     }
 
     const json = await response.json();
+    console.log('[API] Response data count:', json?.data?.length ?? 0, 'totalCount:', json?.totalCount);
     const items: Record<string, string>[] = json?.data ?? [];
 
     return items.map((item, idx): Announcement => {
