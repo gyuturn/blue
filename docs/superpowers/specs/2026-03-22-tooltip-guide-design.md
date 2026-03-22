@@ -12,12 +12,13 @@
 
 | 파일 | 작업 |
 |------|------|
-| `components/ui/Tooltip.tsx` | 신규 — 재사용 Tooltip 클라이언트 컴포넌트 |
+| `components/ui/Tooltip.tsx` | 신규 — 재사용 Tooltip 클라이언트 컴포넌트 (`components/ui/` 디렉토리 신규 생성) |
+| `components/ui/Accordion.tsx` | 신규 — 가이드 페이지 용어 사전용 클라이언트 컴포넌트 |
 | `app/guide/page.tsx` | 신규 — 청약 입문 가이드 페이지 (서버 컴포넌트) |
 | `app/calculator/page.tsx` | 수정 — 주요 입력 필드에 툴팁 추가 |
-| `app/announcements/page.tsx` | 수정 — 공고 관련 용어에 툴팁 추가 |
+| `app/announcements/[id]/page.tsx` | 수정 — 공고 상세 용어(분양가, 전용면적 등)에 툴팁 추가 |
 | `app/page.tsx` | 수정 — 가이드 페이지 진입 버튼 추가 |
-| `components/layout/Header.tsx` | 수정 — 네비게이션에 가이드 링크 추가 |
+| `components/layout/Header.tsx` | 수정 — 네비게이션에 "가이드" 링크 추가 |
 
 ---
 
@@ -27,7 +28,7 @@
 
 ```tsx
 interface TooltipProps {
-  content: string;       // 툴팁 설명 텍스트
+  content: React.ReactNode;  // 문자열 또는 JSX 허용 (향후 링크 포함 대비)
   children: React.ReactNode;
   position?: 'top' | 'bottom'; // 기본값: 'top'
 }
@@ -39,13 +40,27 @@ export function Tooltip({ content, children, position = 'top' }: TooltipProps)
 
 - **데스크탑**: hover 시 툴팁 표시, hover 해제 시 숨김
 - **모바일**: tap 시 토글, 바깥 영역 클릭 시 닫힘
-- `useRef` + `useEffect`로 외부 클릭 감지
+- `useRef` (초기값 `null`) + `useEffect`로 외부 클릭 감지
+- `useEffect` cleanup에서 반드시 `document.removeEventListener` 호출하여 메모리 누수 방지
+
+### 위치 오버플로 처리
+
+- 기본 `position='top'`: 트리거 요소 위에 표시
+- 뷰포트 경계 처리: `whitespace-nowrap` 사용 금지, `max-w-[250px] w-max` 적용
+- 툴팁 컨테이너는 `relative`, 툴팁 박스는 `absolute`로 배치
+- 왼쪽 정렬 기준: `left-0` (트리거가 우측 끝에 있을 때도 뷰포트 밖으로 나가지 않도록 `min-w-0` 고려)
+
+### 접근성
+
+- 트리거 요소에 `aria-describedby={tooltipId}` 적용
+- 툴팁 컨테이너에 `role="tooltip"` + `id={tooltipId}` 적용
+- `ⓘ` 아이콘에 `aria-label="도움말"` 추가
 
 ### 스타일
 
 - 어두운 배경(`bg-gray-800`), 흰 텍스트, 둥근 모서리(`rounded-lg`)
-- 최대 너비 250px, `text-sm`
-- 말풍선 화살표: CSS `::before` pseudo-element 또는 작은 div rotate
+- `max-w-[250px]`, `text-sm`, `p-2`
+- 말풍선 화살표: 작은 `div`에 `rotate-45 bg-gray-800` 적용
 - fade 전환: `transition-opacity duration-150`
 
 ### 사용 예시
@@ -53,7 +68,7 @@ export function Tooltip({ content, children, position = 'top' }: TooltipProps)
 ```tsx
 <Tooltip content="세대원 전원이 주택을 소유하지 않은 기간">
   <span className="cursor-help">
-    무주택기간 <span className="text-blue-500">ⓘ</span>
+    무주택기간 <span className="text-blue-500" aria-label="도움말">ⓘ</span>
   </span>
 </Tooltip>
 ```
@@ -100,6 +115,8 @@ export function Tooltip({ content, children, position = 'top' }: TooltipProps)
 아코디언 UI로 10개 용어:
 - 무주택, 부양가족, 가점제, 추첨제, 전용면적, 공급면적, 분양가, 청약가점, 특별공급, 일반공급
 
+> **구현 노트**: 아코디언은 `useState`가 필요하므로 `components/ui/Accordion.tsx`를 `'use client'` 컴포넌트로 분리하여 구현한다. `app/guide/page.tsx`(서버 컴포넌트)에서 이 클라이언트 컴포넌트를 import하는 방식으로 부분 클라이언트 경계를 형성한다.
+
 ### 하단 CTA
 계산기 바로가기 버튼 → `/calculator`
 
@@ -122,7 +139,11 @@ export function Tooltip({ content, children, position = 'top' }: TooltipProps)
 | Step 5 | 생애최초 | 생애 처음으로 주택을 구입하는 경우 적용되는 특별공급 |
 | Step 5 | 다자녀 | 미성년 자녀 3명 이상 가구 대상 특별공급 |
 
-### 공고 목록/상세 페이지 (`app/announcements/page.tsx`)
+### 공고 상세 페이지 (`app/announcements/[id]/page.tsx`)
+
+분양가, 전용면적 등의 용어는 목록 페이지(`app/announcements/page.tsx`)의 카드에는 노출되지 않고 **상세 페이지**에서 표시된다. 따라서 툴팁은 `[id]/page.tsx`에 적용한다.
+
+> **참고**: `app/announcements/page.tsx`는 공고 목록 카드(단지명, 지역, 접수기간 등)만 표시하므로 툴팁 적용 대상이 아님.
 
 | 용어 | 설명 |
 |------|------|
@@ -143,8 +164,11 @@ export function Tooltip({ content, children, position = 'top' }: TooltipProps)
 
 ## 기술 고려사항
 
-- Tooltip은 `'use client'` 클라이언트 컴포넌트
-- 가이드 페이지는 서버 컴포넌트 (외부 fetch 없음, SEO 최적화)
+- `components/ui/Tooltip.tsx`: `'use client'` 클라이언트 컴포넌트
+- `components/ui/Accordion.tsx`: `'use client'` 클라이언트 컴포넌트 (가이드 페이지 용어 사전용)
+- `app/guide/page.tsx`: 서버 컴포넌트 — `Accordion`만 클라이언트 경계
 - 계산기 페이지는 이미 `'use client'`이므로 Tooltip 직접 import 가능
-- 공고 페이지도 `'use client'`이므로 동일하게 적용
-- Header는 서버 컴포넌트이므로 가이드 링크만 추가 (Tooltip 불필요)
+- 공고 상세 페이지(`[id]/page.tsx`)도 `'use client'`이므로 동일하게 적용
+- Header는 서버 컴포넌트이므로 가이드 `<Link>` 태그만 추가 (Tooltip 불필요)
+- `app/announcements/page.tsx`(공고 목록)는 이번 작업 범위에서 제외 — 툴팁 적용 용어가 없음
+- `app/announcements/[id]/page.tsx`(공고 상세): sessionStorage에서 공고 데이터를 읽는 구조이므로, 계산기를 거친 사용자만 접근 가능 — 이는 기존 설계이며 이번 작업에서 변경하지 않음
