@@ -1,7 +1,29 @@
 import Link from 'next/link';
 import Disclaimer from '@/components/Disclaimer';
+import { getSession } from '@/lib/auth/session';
+import { db } from '@/lib/db';
+import { subscriptionScores } from '@/lib/db/schema';
+import { eq, desc } from 'drizzle-orm';
+import type { SubscriptionScore } from '@/lib/db/schema';
 
-export default function HomePage() {
+async function getLatestScore(userId: string): Promise<SubscriptionScore | null> {
+  try {
+    const [latest] = await db
+      .select()
+      .from(subscriptionScores)
+      .where(eq(subscriptionScores.userId, userId))
+      .orderBy(desc(subscriptionScores.createdAt))
+      .limit(1);
+    return latest ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export default async function HomePage() {
+  const session = await getSession();
+  const latestScore = session ? await getLatestScore(session.id) : null;
+
   return (
     <main className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
       <div className="max-w-md mx-auto px-4 py-12">
@@ -141,6 +163,20 @@ export default function HomePage() {
             </div>
           </div>
         </div>
+
+        {/* Last Score Card */}
+        {latestScore && (
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-4">
+            <p className="text-xs text-blue-500 font-semibold mb-1">내 마지막 청약 가점</p>
+            <div className="flex items-center justify-between">
+              <span className="text-2xl font-bold text-blue-700">{latestScore.totalScore}점</span>
+              <span className="text-xs text-gray-400">{new Date(latestScore.createdAt).toLocaleDateString('ko-KR')}</span>
+            </div>
+            <div className="text-xs text-gray-500 mt-1">
+              무주택 {latestScore.housingScore}점 · 부양가족 {latestScore.dependentScore}점 · 청약통장 {latestScore.subscriptionScore}점
+            </div>
+          </div>
+        )}
 
         {/* CTA Buttons */}
         <div className="space-y-3">

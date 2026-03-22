@@ -1,15 +1,25 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Suspense } from 'react';
 import Disclaimer from '@/components/Disclaimer';
 import { calculateTotalScore, calculateSpecialSupply } from '@/lib/calculator';
 import type { EligibilityInput, StoredScoreData } from '@/types';
+import type { SessionUser } from '@/types/auth';
 
 function ResultContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const [sessionUser, setSessionUser] = useState<SessionUser | null | undefined>(undefined);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((user: SessionUser | null) => setSessionUser(user))
+      .catch(() => setSessionUser(null));
+  }, []);
 
   const data = useMemo(() => {
     const dataParam = searchParams.get('data');
@@ -41,6 +51,32 @@ function ResultContent() {
       sessionStorage.setItem('scoreData', JSON.stringify(scoreData));
     } catch {}
   }, [data, router]);
+
+  useEffect(() => {
+    if (!data || sessionUser === undefined || sessionUser === null) return;
+    setSaveStatus('saving');
+    fetch('/api/scores', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        totalScore: data.scoreResult.totalScore,
+        housingScore: data.scoreResult.homelessScore,
+        dependentScore: data.scoreResult.dependentsScore,
+        subscriptionScore: data.scoreResult.subscriptionScore,
+        tier: data.scoreResult.tier,
+        specialSupply: data.specialSupply,
+        inputSnapshot: data.input,
+      }),
+    })
+      .then((res) => {
+        if (res.ok) {
+          setSaveStatus('saved');
+        } else {
+          setSaveStatus('error');
+        }
+      })
+      .catch(() => setSaveStatus('error'));
+  }, [data, sessionUser]);
 
   if (!data) {
     return (
@@ -114,6 +150,27 @@ function ResultContent() {
             참고용 결과입니다. 공식 결과는 청약홈에서 확인하세요.
           </p>
         </div>
+
+        {/* Save Status Banner */}
+        {sessionUser === null && (
+          <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 mb-4 flex items-center gap-2">
+            <span className="text-gray-500 text-sm">로그인하면 결과를 저장할 수 있어요</span>
+            <a href="/api/auth/kakao" className="ml-auto text-xs font-semibold text-blue-600 hover:underline whitespace-nowrap">카카오 로그인</a>
+          </div>
+        )}
+        {sessionUser !== undefined && sessionUser !== null && saveStatus === 'saved' && (
+          <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 mb-4 flex items-center gap-2">
+            <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <span className="text-green-700 text-sm font-medium">결과가 저장되었습니다</span>
+          </div>
+        )}
+        {sessionUser !== undefined && sessionUser !== null && saveStatus === 'error' && (
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4">
+            <span className="text-red-600 text-sm">저장 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.</span>
+          </div>
+        )}
 
         {/* Score Summary Card */}
         <div className={`rounded-2xl p-6 mb-4 border-2 ${tc.bg} ${tc.border}`}>
