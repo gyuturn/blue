@@ -30,7 +30,8 @@ export async function GET(request: NextRequest) {
 
     await setSession(user, tokens);
     return NextResponse.redirect(new URL('/', request.url));
-  } catch {
+  } catch (err) {
+    console.error('[Kakao callback error]', err);
     return NextResponse.redirect(new URL('/?login=failed', request.url));
   }
 }
