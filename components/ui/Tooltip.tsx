@@ -28,8 +28,8 @@ export function Tooltip({ content, children }: TooltipProps) {
     <span
       ref={containerRef}
       className="relative inline-flex items-center"
-      onMouseEnter={() => setVisible(true)}
-      onMouseLeave={() => setVisible(false)}
+      onPointerEnter={(e) => { if (e.pointerType === 'mouse') setVisible(true); }}
+      onPointerLeave={(e) => { if (e.pointerType === 'mouse') setVisible(false); }}
       onClick={() => setVisible((v) => !v)}
       aria-describedby={visible ? tooltipId : undefined}
     >
@@ -38,7 +38,7 @@ export function Tooltip({ content, children }: TooltipProps) {
         <span
           id={tooltipId}
           role="tooltip"
-          className="absolute bottom-full left-0 mb-2 z-50 w-max max-w-[250px] rounded-lg bg-gray-800 px-3 py-2 text-xs text-white shadow-lg transition-opacity duration-150"
+          className="absolute bottom-full left-0 mb-2 z-50 w-max max-w-[250px] rounded-lg bg-gray-800 px-3 py-2 text-xs text-white shadow-lg"
         >
           {content}
           {/* 화살표: block으로 transform 적용 보장 */}
