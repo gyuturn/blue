@@ -14,6 +14,9 @@ export default async function Header() {
         </Link>
 
         <nav className="flex items-center gap-6">
+          <Link href="/guide" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
+            가이드
+          </Link>
           <Link href="/announcements" className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
             공고목록
           </Link>
