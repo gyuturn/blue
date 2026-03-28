@@ -1,0 +1,37 @@
+{
+  "project": {
+    "name": "AI Stock Recommendation",
+    "description": "AI 기반 주식 매수/매도 추천 시스템",
+    "repository": "https://github.com/gyuturn/stock"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(gh:*)",
+      "Bash(git:*)",
+      "Bash(mvn:*)",
+      "Bash(gradle:*)",
+      "Bash(npm:*)",
+      "Bash(yarn:*)",
+      "Bash(java:*)",
+      "Read(/Users/kimgyumin/Desktop/dev/blue/.env.local)",
+      "Edit(/Users/kimgyumin/Desktop/dev/blue/.env.local)"
+    ]
+  },
+  "techStack": {
+    "backend": {
+      "language": "Java",
+      "framework": "Spring Boot",
+      "orm": "JPA"
+    },
+    "frontend": {
+      "framework": "Vue.js"
+    },
+    "ci_cd": "GitHub Actions"
+  },
+  "agents": {
+    "pm": ".claude/agents/pm.md",
+    "planner": ".claude/agents/planner.md",
+    "cto": ".claude/agents/cto.md",
+    "developer": ".claude/agents/developer.md"
+  }
+}
