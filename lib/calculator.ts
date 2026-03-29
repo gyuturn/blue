@@ -1,6 +1,65 @@
 import type { EligibilityInput, ScoreResult, SpecialSupplyEligibility } from '@/types';
 
 /**
+ * 무주택기간 산정 시작일 계산 (주택공급에관한규칙)
+ * - 만 30세 미만 미혼: null (산정 불가)
+ * - 만 30세 이상 미혼: 만 30세 생일
+ * - 기혼 + 만 30세 미만: 혼인신고일
+ * - 기혼 + 만 30세 이상: 만 30세 생일 vs 혼인신고일 중 빠른 날
+ */
+export function calcHomelessStartDate(
+  birthDate: string,
+  isMarried: boolean,
+  marriageDate: string,
+): Date | null {
+  if (!birthDate) return null;
+
+  const [birthYear, birthMonth] = birthDate.split('-').map(Number);
+  if (!birthYear || !birthMonth) return null;
+
+  const thirtiethBirthday = new Date(birthYear + 30, birthMonth - 1, 1);
+  const now = new Date();
+
+  if (!isMarried) {
+    // 미혼: 만 30세 미만이면 산정 불가
+    if (now < thirtiethBirthday) return null;
+    return thirtiethBirthday;
+  }
+
+  // 기혼: 혼인신고일 파싱
+  const marriageStart = (() => {
+    if (!marriageDate) return null;
+    const [y, m] = marriageDate.split('-').map(Number);
+    if (!y || !m) return null;
+    return new Date(y, m - 1, 1);
+  })();
+
+  if (!marriageStart) return null;
+
+  // 만 30세 이전에 결혼: 혼인신고일부터
+  if (marriageStart < thirtiethBirthday) return marriageStart;
+
+  // 만 30세 이후에 결혼: 만 30세 생일부터 (더 빠름)
+  return thirtiethBirthday;
+}
+
+/**
+ * 정책 기준으로 무주택기간(년) 계산
+ */
+export function calcHomelessYearsFromPolicy(
+  birthDate: string,
+  isMarried: boolean,
+  marriageDate: string,
+): number {
+  const startDate = calcHomelessStartDate(birthDate, isMarried, marriageDate);
+  if (!startDate) return 0;
+
+  const now = new Date();
+  const diffMs = now.getTime() - startDate.getTime();
+  return Math.max(0, diffMs / (1000 * 60 * 60 * 24 * 365.25));
+}
+
+/**
  * 무주택 기간 점수 계산
  * 1년 미만: 2점, 1년~1년 미만: 2점, 최대 32점 (16년 이상)
  * 기준: 1년 = 2점, 2점씩 증가, 최대 16년 이상 = 32점

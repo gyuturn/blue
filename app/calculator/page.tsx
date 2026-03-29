@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import StepIndicator from '@/components/StepIndicator';
 import Disclaimer from '@/components/Disclaimer';
 import { Tooltip } from '@/components/ui/Tooltip';
+import { calcHomelessStartDate, calcHomelessYearsFromPolicy } from '@/lib/calculator';
 import type { EligibilityInput } from '@/types';
 
 const REGIONS = [
@@ -33,6 +34,7 @@ const TOTAL_STEPS = 5;
 
 const defaultInput: EligibilityInput = {
   isHomeless: true,
+  birthDate: '',
   homelessYears: 0,
   dependentsCount: 0,
   subscriptionStartDate: '',
@@ -54,7 +56,18 @@ export default function CalculatorPage() {
     key: K,
     value: EligibilityInput[K],
   ) => {
-    setInput((prev) => ({ ...prev, [key]: value }));
+    setInput((prev) => {
+      const next = { ...prev, [key]: value };
+      // birthDate, isMarried, marriageDate 변경 시 homelessYears 자동 재계산
+      if (key === 'birthDate' || key === 'isMarried' || key === 'marriageDate') {
+        next.homelessYears = calcHomelessYearsFromPolicy(
+          next.birthDate,
+          next.isMarried,
+          next.marriageDate,
+        );
+      }
+      return next;
+    });
   };
 
   const handleNext = () => {
@@ -114,6 +127,9 @@ export default function CalculatorPage() {
           {step === 1 && (
             <Step1
               isHomeless={input.isHomeless}
+              birthDate={input.birthDate}
+              isMarried={input.isMarried}
+              marriageDate={input.marriageDate}
               homelessYears={input.homelessYears}
               onChange={updateInput}
             />
@@ -173,16 +189,32 @@ export default function CalculatorPage() {
 // Step 1: 무주택 여부 및 기간
 function Step1({
   isHomeless,
+  birthDate,
+  isMarried,
+  marriageDate,
   homelessYears,
   onChange,
 }: {
   isHomeless: boolean;
+  birthDate: string;
+  isMarried: boolean;
+  marriageDate: string;
   homelessYears: number;
   onChange: <K extends keyof EligibilityInput>(
     key: K,
     value: EligibilityInput[K],
   ) => void;
 }) {
+  const startDate = calcHomelessStartDate(birthDate, isMarried, marriageDate);
+  const isUnder30Single = isHomeless && birthDate && !isMarried && startDate === null;
+
+  const startDateLabel = (() => {
+    if (!startDate) return null;
+    return `${startDate.getFullYear()}년 ${startDate.getMonth() + 1}월`;
+  })();
+
+  const homelessYearsFloor = Math.floor(homelessYears);
+
   return (
     <div>
       <h2 className="text-lg font-bold text-gray-900 mb-1">
@@ -251,36 +283,48 @@ function Step1({
       {isHomeless && (
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-2">
-            <Tooltip content="무주택 상태가 지속된 기간입니다. 최대 32점이며 16년 이상이면 만점입니다.">
-              <span>무주택 기간 <span className="text-blue-400" aria-label="도움말">ⓘ</span></span>
+            <Tooltip content="무주택기간 산정 시작일은 만 30세 생일 또는 혼인신고일 중 빠른 날입니다. 만 30세 미만 미혼인 경우 산정되지 않습니다.">
+              <span>생년월일 <span className="text-blue-400" aria-label="도움말">ⓘ</span></span>
             </Tooltip>
           </label>
-          <div className="flex items-center gap-3">
-            <input
-              type="range"
-              min={0}
-              max={16}
-              value={homelessYears}
-              onChange={(e) =>
-                onChange('homelessYears', Number(e.target.value))
-              }
-              className="flex-1 accent-blue-600"
-            />
-            <span className="text-blue-600 font-bold text-lg w-16 text-right">
-              {homelessYears}년
-            </span>
-          </div>
-          <div className="flex justify-between text-xs text-gray-400 mt-1">
-            <span>1년 미만</span>
-            <span>16년 이상</span>
-          </div>
-          <p className="text-xs text-gray-500 mt-2">
-            예상 점수:{' '}
-            <span className="font-semibold text-blue-600">
-              {homelessYears <= 0 ? 2 : Math.min(homelessYears * 2, 32)}점
-            </span>{' '}
-            / 32점
-          </p>
+          <input
+            type="month"
+            value={birthDate}
+            onChange={(e) => onChange('birthDate', e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="YYYY-MM"
+          />
+
+          {isUnder30Single && (
+            <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-xs text-yellow-700 font-medium">
+                만 30세 미만 미혼인 경우 무주택기간이 산정되지 않습니다.
+              </p>
+              <p className="text-xs text-yellow-600 mt-0.5">
+                만 30세가 되는 날부터 무주택기간이 시작됩니다.
+              </p>
+            </div>
+          )}
+
+          {startDate && birthDate && (
+            <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-xs text-blue-600 font-medium mb-1">무주택기간 자동 계산 결과</p>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-600">산정 시작일</span>
+                <span className="text-xs font-semibold text-gray-800">{startDateLabel}</span>
+              </div>
+              <div className="flex justify-between items-center mt-1">
+                <span className="text-xs text-gray-600">무주택기간</span>
+                <span className="text-xs font-semibold text-blue-700">{homelessYearsFloor}년</span>
+              </div>
+              <div className="flex justify-between items-center mt-1">
+                <span className="text-xs text-gray-600">예상 점수</span>
+                <span className="text-xs font-semibold text-blue-700">
+                  {homelessYearsFloor <= 0 ? 2 : Math.min(homelessYearsFloor * 2, 32)}점 / 32점
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -2,7 +2,8 @@
 export interface EligibilityInput {
   // 무주택 정보
   isHomeless: boolean;
-  homelessYears: number; // 무주택 기간 (년)
+  birthDate: string; // 생년월일 YYYY-MM 형식
+  homelessYears: number; // 무주택 기간 (년, 정책 기준 자동 계산값)
 
   // 부양가족
   dependentsCount: number; // 부양가족 수 (배우자 포함)
