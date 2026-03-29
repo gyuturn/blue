@@ -25,12 +25,19 @@ jobs:
       - name: Pull Vercel environment
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
+      - name: Sync env vars to Vercel
+        run: |
+          printf '%s' "${{ secrets.KAKAO_CLIENT_ID }}" | vercel env add KAKAO_CLIENT_ID production --token=${{ secrets.VERCEL_TOKEN }} --force 2>/dev/null || \
+          (vercel env rm KAKAO_CLIENT_ID production --yes --token=${{ secrets.VERCEL_TOKEN }} && printf '%s' "${{ secrets.KAKAO_CLIENT_ID }}" | vercel env add KAKAO_CLIENT_ID production --token=${{ secrets.VERCEL_TOKEN }})
+
+          printf '%s' "${{ secrets.KAKAO_CLIENT_SECRET }}" | vercel env add KAKAO_CLIENT_SECRET production --token=${{ secrets.VERCEL_TOKEN }} --force 2>/dev/null || \
+          (vercel env rm KAKAO_CLIENT_SECRET production --yes --token=${{ secrets.VERCEL_TOKEN }} && printf '%s' "${{ secrets.KAKAO_CLIENT_SECRET }}" | vercel env add KAKAO_CLIENT_SECRET production --token=${{ secrets.VERCEL_TOKEN }})
+
+          printf '%s' "${{ secrets.KAKAO_REDIRECT_URI }}" | vercel env add KAKAO_REDIRECT_URI production --token=${{ secrets.VERCEL_TOKEN }} --force 2>/dev/null || \
+          (vercel env rm KAKAO_REDIRECT_URI production --yes --token=${{ secrets.VERCEL_TOKEN }} && printf '%s' "${{ secrets.KAKAO_REDIRECT_URI }}" | vercel env add KAKAO_REDIRECT_URI production --token=${{ secrets.VERCEL_TOKEN }})
+
       - name: Build
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          KAKAO_CLIENT_ID: ${{ secrets.KAKAO_CLIENT_ID }}
-          KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
-          KAKAO_REDIRECT_URI: ${{ secrets.KAKAO_REDIRECT_URI }}
 
       - name: Deploy
         run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
