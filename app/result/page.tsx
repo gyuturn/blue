@@ -54,7 +54,6 @@ function ResultContent() {
 
   useEffect(() => {
     if (!data || sessionUser === undefined || sessionUser === null) return;
-    setSaveStatus('saving');
     fetch('/api/scores', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
