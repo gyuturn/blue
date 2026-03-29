@@ -57,6 +57,7 @@ jobs:
           sync_env "KAKAO_CLIENT_ID" "${{ secrets.KAKAO_CLIENT_ID }}"
           sync_env "KAKAO_CLIENT_SECRET" "${{ secrets.KAKAO_CLIENT_SECRET }}"
           sync_env "KAKAO_REDIRECT_URI" "${{ secrets.KAKAO_REDIRECT_URI }}"
+          sync_env "PUBLIC_DATA_API_KEY" "${{ secrets.PUBLIC_DATA_API_KEY }}"
 
       - name: Build
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
