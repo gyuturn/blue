@@ -27,14 +27,36 @@ jobs:
 
       - name: Sync env vars to Vercel
         run: |
-          printf '%s' "${{ secrets.KAKAO_CLIENT_ID }}" | vercel env add KAKAO_CLIENT_ID production --token=${{ secrets.VERCEL_TOKEN }} --force 2>/dev/null || \
-          (vercel env rm KAKAO_CLIENT_ID production --yes --token=${{ secrets.VERCEL_TOKEN }} && printf '%s' "${{ secrets.KAKAO_CLIENT_ID }}" | vercel env add KAKAO_CLIENT_ID production --token=${{ secrets.VERCEL_TOKEN }})
+          PROJECT_ID=$(cat .vercel/project.json | python3 -c "import sys,json; print(json.load(sys.stdin)['projectId'])")
+          echo "Project ID: $PROJECT_ID"
 
-          printf '%s' "${{ secrets.KAKAO_CLIENT_SECRET }}" | vercel env add KAKAO_CLIENT_SECRET production --token=${{ secrets.VERCEL_TOKEN }} --force 2>/dev/null || \
-          (vercel env rm KAKAO_CLIENT_SECRET production --yes --token=${{ secrets.VERCEL_TOKEN }} && printf '%s' "${{ secrets.KAKAO_CLIENT_SECRET }}" | vercel env add KAKAO_CLIENT_SECRET production --token=${{ secrets.VERCEL_TOKEN }})
+          sync_env() {
+            KEY=$1
+            VALUE=$2
+            # 기존 env var ID 조회
+            ENV_ID=$(curl -sf "https://api.vercel.com/v9/projects/$PROJECT_ID/env?decrypt=false" \
+              -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}" | \
+              python3 -c "import sys,json; envs=json.load(sys.stdin).get('envs',[]); match=[e['id'] for e in envs if e['key']=='$KEY' and 'production' in e.get('target',[])]; print(match[0] if match else '')")
 
-          printf '%s' "${{ secrets.KAKAO_REDIRECT_URI }}" | vercel env add KAKAO_REDIRECT_URI production --token=${{ secrets.VERCEL_TOKEN }} --force 2>/dev/null || \
-          (vercel env rm KAKAO_REDIRECT_URI production --yes --token=${{ secrets.VERCEL_TOKEN }} && printf '%s' "${{ secrets.KAKAO_REDIRECT_URI }}" | vercel env add KAKAO_REDIRECT_URI production --token=${{ secrets.VERCEL_TOKEN }})
+            if [ -n "$ENV_ID" ]; then
+              echo "Updating $KEY (id: $ENV_ID)"
+              curl -sf -X PATCH "https://api.vercel.com/v9/projects/$PROJECT_ID/env/$ENV_ID" \
+                -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}" \
+                -H "Content-Type: application/json" \
+                -d "{\"value\": \"$VALUE\", \"type\": \"plain\", \"target\": [\"production\"]}"
+            else
+              echo "Creating $KEY"
+              curl -sf -X POST "https://api.vercel.com/v10/projects/$PROJECT_ID/env" \
+                -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}" \
+                -H "Content-Type: application/json" \
+                -d "{\"key\": \"$KEY\", \"value\": \"$VALUE\", \"type\": \"plain\", \"target\": [\"production\"]}"
+            fi
+            echo "$KEY synced"
+          }
+
+          sync_env "KAKAO_CLIENT_ID" "${{ secrets.KAKAO_CLIENT_ID }}"
+          sync_env "KAKAO_CLIENT_SECRET" "${{ secrets.KAKAO_CLIENT_SECRET }}"
+          sync_env "KAKAO_REDIRECT_URI" "${{ secrets.KAKAO_REDIRECT_URI }}"
 
       - name: Build
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
