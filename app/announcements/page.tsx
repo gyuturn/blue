@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import Disclaimer from '@/components/Disclaimer';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import type { Announcement, StoredScoreData } from '@/types';
-import { getDday, getDdayBadgeStyle, getScoreTierLabel, getGeneralSupplyLabel, getSpecialSupplyLabels, getSubscriptionStatus } from '@/lib/announcements';
+import { getDday, getDdayBadgeStyle, getScoreTierLabel, getGeneralSupplyLabel, getSpecialSupplyLabels } from '@/lib/announcements';
+import type { AnnouncementDetail } from '@/types';
 
 const REGION_OPTIONS = [
   '전체',
@@ -399,13 +400,31 @@ function AnnouncementCard({ announcement, scoreData, onSelect }: { announcement:
 }
 
 function AnnouncementDetail({ announcement, scoreData }: { announcement: Announcement; scoreData: StoredScoreData | null }) {
+  const [detail, setDetail] = useState<AnnouncementDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(true);
+  const [detailError, setDetailError] = useState(false);
+
   const dday = getDday(announcement.subscriptionStartDate, announcement.subscriptionEndDate);
   const ddayBadge = getDdayBadgeStyle(dday);
-  const status = getSubscriptionStatus(announcement.subscriptionStartDate ?? '', announcement.subscriptionEndDate ?? '');
 
   const tierLabel = scoreData ? getScoreTierLabel(scoreData.result.tier) : null;
   const generalSupply = scoreData ? getGeneralSupplyLabel(scoreData.input) : null;
   const specialLabels = scoreData ? getSpecialSupplyLabels(scoreData.specialSupply, announcement.specialSupplyTypes) : [];
+
+  useEffect(() => {
+    setDetailLoading(true);
+    setDetailError(false);
+    const houseManageNo = announcement.id;
+    const pblancNo = announcement.pblancNo ?? announcement.id;
+    fetch(`/api/announcements/detail?houseManageNo=${houseManageNo}&pblancNo=${pblancNo}`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.data) setDetail(json.data);
+        else setDetailError(true);
+      })
+      .catch(() => setDetailError(true))
+      .finally(() => setDetailLoading(false));
+  }, [announcement.id, announcement.pblancNo]);
 
   return (
     <div className="px-5 pb-8">
@@ -444,80 +463,112 @@ function AnnouncementDetail({ announcement, scoreData }: { announcement: Announc
         </div>
       )}
 
-      {/* 핵심 정보 */}
-      <div className="bg-gray-50 rounded-xl p-4 space-y-3 mb-4">
-        <InfoRow label="접수 상태" value={status === '일정미정' ? '일정 미정' : status} />
-        {announcement.subscriptionStartDate && (
-          <InfoRow
-            label="청약 접수"
-            value={`${announcement.subscriptionStartDate} ~ ${announcement.subscriptionEndDate}`}
-          />
-        )}
-        {announcement.announcementDate && (
-          <InfoRow label="공고일" value={announcement.announcementDate} />
-        )}
-        <InfoRow label="주택 유형" value={announcement.houseType} />
-        {announcement.totalHouseholds !== undefined && (
-          <InfoRow label="총 세대수" value={`${announcement.totalHouseholds.toLocaleString()}세대`} />
-        )}
-      </div>
-
-      {/* 특별공급 제공 여부 */}
-      {announcement.specialSupplyTypes && (
-        <div className="mb-4">
-          <p className="text-xs font-semibold text-gray-500 mb-2">특별공급 유형</p>
-          <div className="flex gap-2 flex-wrap">
-            {announcement.specialSupplyTypes.newlyWed && (
-              <span className="text-xs px-2 py-1 rounded-lg bg-pink-50 text-pink-600 font-medium">신혼부부</span>
-            )}
-            {announcement.specialSupplyTypes.firstHome && (
-              <span className="text-xs px-2 py-1 rounded-lg bg-indigo-50 text-indigo-600 font-medium">생애최초</span>
-            )}
-            {announcement.specialSupplyTypes.multiChild && (
-              <span className="text-xs px-2 py-1 rounded-lg bg-teal-50 text-teal-600 font-medium">다자녀</span>
-            )}
-            {!announcement.specialSupplyTypes.newlyWed && !announcement.specialSupplyTypes.firstHome && !announcement.specialSupplyTypes.multiChild && (
-              <span className="text-xs text-gray-400">특별공급 없음</span>
-            )}
-          </div>
+      {/* 청약홈 상세 데이터 */}
+      {detailLoading ? (
+        <div className="space-y-3 mb-4">
+          {[1, 2, 3].map((n) => (
+            <div key={n} className="h-10 bg-gray-100 rounded-xl animate-pulse" />
+          ))}
         </div>
+      ) : detailError || !detail ? (
+        /* 스크래핑 실패 시 기존 API 데이터로 폴백 */
+        <div className="bg-gray-50 rounded-xl p-4 space-y-3 mb-4">
+          {announcement.subscriptionStartDate && (
+            <InfoRow label="청약 접수" value={`${announcement.subscriptionStartDate} ~ ${announcement.subscriptionEndDate}`} />
+          )}
+          {announcement.announcementDate && (
+            <InfoRow label="공고일" value={announcement.announcementDate} />
+          )}
+          <InfoRow label="주택 유형" value={announcement.houseType} />
+          {announcement.totalHouseholds !== undefined && (
+            <InfoRow label="총 세대수" value={`${announcement.totalHouseholds.toLocaleString()}세대`} />
+          )}
+        </div>
+      ) : (
+        <>
+          {/* 기본 정보 */}
+          <div className="bg-gray-50 rounded-xl p-4 space-y-3 mb-4">
+            <SectionLabel>기본 정보</SectionLabel>
+            {detail.location && <InfoRow label="위치" value={detail.location} />}
+            {detail.totalSupply && <InfoRow label="공급 규모" value={detail.totalSupply} />}
+            {detail.constructor && <InfoRow label="시공사" value={detail.constructor} />}
+            {detail.operator && <InfoRow label="시행사" value={detail.operator} />}
+            {detail.moveInDate && <InfoRow label="입주 예정" value={detail.moveInDate} highlight />}
+          </div>
+
+          {/* 청약 일정 */}
+          <div className="bg-gray-50 rounded-xl p-4 mb-4">
+            <SectionLabel>청약 일정</SectionLabel>
+            <div className="space-y-3 mt-3">
+              {detail.announcementDate && <InfoRow label="모집공고일" value={detail.announcementDate} />}
+              {detail.schedule.map((s) => (
+                <div key={s.type} className="flex items-start gap-2 text-sm">
+                  <span className="text-gray-400 w-20 flex-shrink-0 text-xs pt-0.5">{s.type}</span>
+                  <div>
+                    <p className="text-gray-800 font-medium text-xs">{s.localDate || s.otherDate}</p>
+                    {s.place && <p className="text-gray-400 text-xs">{s.place}</p>}
+                  </div>
+                </div>
+              ))}
+              {detail.winnerDate && <InfoRow label="당첨자 발표" value={detail.winnerDate} highlight />}
+              {detail.contractPeriod && <InfoRow label="계약일" value={detail.contractPeriod} />}
+            </div>
+          </div>
+
+          {/* 주택형별 공급 */}
+          {detail.units.length > 0 && (
+            <div className="mb-4">
+              <SectionLabel>주택형별 공급</SectionLabel>
+              <div className="mt-3 rounded-xl overflow-hidden border border-gray-100">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="text-left px-3 py-2 text-gray-500 font-semibold">주택형</th>
+                      <th className="text-right px-3 py-2 text-gray-500 font-semibold">세대수</th>
+                      <th className="text-right px-3 py-2 text-gray-500 font-semibold">분양가(만원)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {detail.units.map((u, i) => (
+                      <tr key={i} className="bg-white">
+                        <td className="px-3 py-2.5 text-gray-800 font-medium">{u.type}</td>
+                        <td className="px-3 py-2.5 text-gray-700 text-right">{u.totalCount || '-'}</td>
+                        <td className="px-3 py-2.5 text-gray-700 text-right">{u.price || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
-      {/* 청약 일정 가이드 */}
-      <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-4">
-        <p className="text-xs font-semibold text-blue-700 mb-2">청약 진행 순서</p>
-        <ol className="text-xs text-blue-600 space-y-1 list-decimal list-inside">
-          <li>청약홈(applyhome.co.kr) 회원가입 / 공인인증서 등록</li>
-          <li>청약통장 가입 확인 (은행 앱 또는 청약홈)</li>
-          <li>공고문에서 공급 조건·자격 확인</li>
-          <li>접수 기간 내 청약홈에서 신청</li>
-          <li>당첨자 발표 확인 후 서류 제출</li>
-        </ol>
-      </div>
-
-      {/* PDF 링크 */}
-      {announcement.pdfUrl && (
-        <a
-          href={announcement.pdfUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-          </svg>
-          청약홈에서 공고문 확인
-        </a>
-      )}
+      {/* 청약홈 바로가기 */}
+      <a
+        href={`https://www.applyhome.co.kr/ai/aia/selectAPTLttotPblancDetail.do?houseManageNo=${announcement.id}&pblancNo=${announcement.pblancNo ?? announcement.id}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center justify-center gap-2 w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+        </svg>
+        청약홈에서 직접 보기
+      </a>
     </div>
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function InfoRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div className="flex items-center gap-2 text-sm">
-      <span className="text-gray-400 w-20 flex-shrink-0 text-xs">{label}</span>
-      <span className="text-gray-800 font-medium">{value}</span>
+    <div className="flex items-start gap-2 text-sm">
+      <span className="text-gray-400 w-20 flex-shrink-0 text-xs pt-0.5">{label}</span>
+      <span className={`font-medium text-xs leading-snug ${highlight ? 'text-blue-600' : 'text-gray-800'}`}>{value}</span>
     </div>
   );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">{children}</p>;
 }
