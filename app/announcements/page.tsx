@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Disclaimer from '@/components/Disclaimer';
+import { BottomSheet } from '@/components/ui/BottomSheet';
 import type { Announcement, StoredScoreData } from '@/types';
-import { getDday, getDdayBadgeStyle, getScoreTierLabel, getGeneralSupplyLabel, getSpecialSupplyLabels } from '@/lib/announcements';
+import { getDday, getDdayBadgeStyle, getScoreTierLabel, getGeneralSupplyLabel, getSpecialSupplyLabels, getSubscriptionStatus } from '@/lib/announcements';
 
 const REGION_OPTIONS = [
   '전체',
@@ -43,6 +44,7 @@ export default function AnnouncementsPage() {
   const [selectedRegion, setSelectedRegion] = useState('전체');
   const [isMock, setIsMock] = useState(false);
   const [hideExpired, setHideExpired] = useState(true);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
 
   useEffect(() => {
     try {
@@ -241,7 +243,7 @@ export default function AnnouncementsPage() {
         ) : (
           <div className="space-y-3">
             {filteredAnnouncements.map((item) => (
-              <AnnouncementCard key={item.id} announcement={item} scoreData={scoreData} />
+              <AnnouncementCard key={item.id} announcement={item} scoreData={scoreData} onSelect={setSelectedAnnouncement} />
             ))}
           </div>
         )}
@@ -255,6 +257,12 @@ export default function AnnouncementsPage() {
 
         <Disclaimer />
       </div>
+
+      {selectedAnnouncement && (
+        <BottomSheet isOpen={!!selectedAnnouncement} onClose={() => setSelectedAnnouncement(null)}>
+          <AnnouncementDetail announcement={selectedAnnouncement} scoreData={scoreData} />
+        </BottomSheet>
+      )}
     </main>
   );
 }
@@ -277,16 +285,12 @@ function StatusBadge({ status }: { status: string | undefined }) {
   );
 }
 
-function AnnouncementCard({ announcement, scoreData }: { announcement: Announcement; scoreData: StoredScoreData | null }) {
-  const router = useRouter();
+function AnnouncementCard({ announcement, scoreData, onSelect }: { announcement: Announcement; scoreData: StoredScoreData | null; onSelect: (a: Announcement) => void }) {
   const dday = getDday(announcement.subscriptionStartDate, announcement.subscriptionEndDate);
   const ddayBadge = getDdayBadgeStyle(dday);
 
   const handleCardClick = () => {
-    try {
-      sessionStorage.setItem('selectedAnnouncement', JSON.stringify(announcement));
-    } catch {}
-    router.push(`/announcements/${announcement.id}`);
+    onSelect(announcement);
   };
 
   const tierLabel = scoreData ? getScoreTierLabel(scoreData.result.tier) : null;
@@ -390,6 +394,130 @@ function AnnouncementCard({ announcement, scoreData }: { announcement: Announcem
           </a>
         </div>
       )}
+    </div>
+  );
+}
+
+function AnnouncementDetail({ announcement, scoreData }: { announcement: Announcement; scoreData: StoredScoreData | null }) {
+  const dday = getDday(announcement.subscriptionStartDate, announcement.subscriptionEndDate);
+  const ddayBadge = getDdayBadgeStyle(dday);
+  const status = getSubscriptionStatus(announcement.subscriptionStartDate ?? '', announcement.subscriptionEndDate ?? '');
+
+  const tierLabel = scoreData ? getScoreTierLabel(scoreData.result.tier) : null;
+  const generalSupply = scoreData ? getGeneralSupplyLabel(scoreData.input) : null;
+  const specialLabels = scoreData ? getSpecialSupplyLabels(scoreData.specialSupply, announcement.specialSupplyTypes) : [];
+
+  return (
+    <div className="px-5 pb-8">
+      {/* 단지명 + 상태 */}
+      <div className="flex items-start justify-between gap-2 mb-1">
+        <h2 className="text-lg font-bold text-gray-900 leading-snug flex-1">{announcement.complexName}</h2>
+        <div className="flex items-center gap-1.5 flex-shrink-0 mt-0.5">
+          <StatusBadge status={announcement.status} />
+          {dday && dday !== '마감' && (
+            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${ddayBadge.className}`}>
+              {ddayBadge.label}
+            </span>
+          )}
+        </div>
+      </div>
+      <p className="text-sm text-gray-500 mb-4">{announcement.builder} · {announcement.region}</p>
+
+      {/* 내 가점 매칭 */}
+      {scoreData && (
+        <div className="flex flex-wrap gap-1.5 mb-4">
+          {tierLabel && (
+            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${tierLabel.style}`}>
+              {tierLabel.text}
+            </span>
+          )}
+          {generalSupply && !generalSupply.eligible && (
+            <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-red-50 text-red-500">
+              {generalSupply.text}
+            </span>
+          )}
+          {specialLabels.map((label) => (
+            <span key={label} className="text-xs px-2 py-0.5 rounded-full font-semibold bg-purple-100 text-purple-700">
+              {label}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* 핵심 정보 */}
+      <div className="bg-gray-50 rounded-xl p-4 space-y-3 mb-4">
+        <InfoRow label="접수 상태" value={status === '일정미정' ? '일정 미정' : status} />
+        {announcement.subscriptionStartDate && (
+          <InfoRow
+            label="청약 접수"
+            value={`${announcement.subscriptionStartDate} ~ ${announcement.subscriptionEndDate}`}
+          />
+        )}
+        {announcement.announcementDate && (
+          <InfoRow label="공고일" value={announcement.announcementDate} />
+        )}
+        <InfoRow label="주택 유형" value={announcement.houseType} />
+        {announcement.totalHouseholds !== undefined && (
+          <InfoRow label="총 세대수" value={`${announcement.totalHouseholds.toLocaleString()}세대`} />
+        )}
+      </div>
+
+      {/* 특별공급 제공 여부 */}
+      {announcement.specialSupplyTypes && (
+        <div className="mb-4">
+          <p className="text-xs font-semibold text-gray-500 mb-2">특별공급 유형</p>
+          <div className="flex gap-2 flex-wrap">
+            {announcement.specialSupplyTypes.newlyWed && (
+              <span className="text-xs px-2 py-1 rounded-lg bg-pink-50 text-pink-600 font-medium">신혼부부</span>
+            )}
+            {announcement.specialSupplyTypes.firstHome && (
+              <span className="text-xs px-2 py-1 rounded-lg bg-indigo-50 text-indigo-600 font-medium">생애최초</span>
+            )}
+            {announcement.specialSupplyTypes.multiChild && (
+              <span className="text-xs px-2 py-1 rounded-lg bg-teal-50 text-teal-600 font-medium">다자녀</span>
+            )}
+            {!announcement.specialSupplyTypes.newlyWed && !announcement.specialSupplyTypes.firstHome && !announcement.specialSupplyTypes.multiChild && (
+              <span className="text-xs text-gray-400">특별공급 없음</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 청약 일정 가이드 */}
+      <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-4">
+        <p className="text-xs font-semibold text-blue-700 mb-2">청약 진행 순서</p>
+        <ol className="text-xs text-blue-600 space-y-1 list-decimal list-inside">
+          <li>청약홈(applyhome.co.kr) 회원가입 / 공인인증서 등록</li>
+          <li>청약통장 가입 확인 (은행 앱 또는 청약홈)</li>
+          <li>공고문에서 공급 조건·자격 확인</li>
+          <li>접수 기간 내 청약홈에서 신청</li>
+          <li>당첨자 발표 확인 후 서류 제출</li>
+        </ol>
+      </div>
+
+      {/* PDF 링크 */}
+      {announcement.pdfUrl && (
+        <a
+          href={announcement.pdfUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center gap-2 w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+          </svg>
+          청약홈에서 공고문 확인
+        </a>
+      )}
+    </div>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <span className="text-gray-400 w-20 flex-shrink-0 text-xs">{label}</span>
+      <span className="text-gray-800 font-medium">{value}</span>
     </div>
   );
 }
