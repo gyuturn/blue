@@ -54,6 +54,7 @@ export type SubscriptionStatus = '접수중' | '접수예정' | '마감';
 // 청약 공고 타입
 export interface Announcement {
   id: string;
+  pblancNo?: string; // 공고번호 (청약홈 상세 URL용)
   complexName: string; // 단지명
   builder: string; // 건설사
   region: string; // 지역
@@ -69,4 +70,28 @@ export interface Announcement {
     firstHome: boolean;  // 생애최초 특별공급 있음
     multiChild: boolean; // 다자녀 특별공급 있음
   };
+}
+
+// 청약홈 스크래핑 상세 데이터
+export interface AnnouncementDetail {
+  location?: string;        // 공급 위치
+  totalSupply?: string;     // 공급 규모
+  operator?: string;        // 시행사
+  constructor?: string;     // 시공사
+  moveInDate?: string;      // 입주 예정월
+  announcementDate?: string; // 모집공고일
+  winnerDate?: string;       // 당첨자 발표일
+  contractPeriod?: string;   // 계약일
+  schedule: {
+    type: string;   // 특별공급 / 1순위 / 2순위
+    localDate?: string;
+    otherDate?: string;
+    place?: string;
+  }[];
+  units: {
+    type: string;         // 주택형 (예: 084.40A)
+    supplyArea?: string;  // 공급면적
+    totalCount?: string;  // 공급 세대수
+    price?: string;       // 분양가
+  }[];
 }
