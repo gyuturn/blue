@@ -91,19 +91,22 @@ export async function fetchAnnouncementsFromAPI(region?: string): Promise<Announ
   try {
     const baseUrl =
       'https://api.odcloud.kr/api/ApplyhomeInfoDetailSvc/v1/getAPTLttotPblancDetail';
-    const params = new URLSearchParams({
+
+    // serviceKey는 공공데이터포털 인코딩 키를 URL에 직접 삽입 (URLSearchParams 이중인코딩 방지)
+    const queryParams = new URLSearchParams({
       page: '1',
       perPage: '20',
-      serviceKey: apiKey,
       returnType: 'JSON',
     });
 
     if (region) {
       const resolvedRegion = resolveRegionParam(region);
-      params.append('cond[SUBSCRPT_AREA_CODE_NM::EQ]', resolvedRegion);
+      queryParams.append('cond[SUBSCRPT_AREA_CODE_NM::EQ]', resolvedRegion);
     }
 
-    const response = await fetch(`${baseUrl}?${params.toString()}`, {
+    const url = `${baseUrl}?serviceKey=${apiKey}&${queryParams.toString()}`;
+
+    const response = await fetch(url, {
       signal: controller.signal,
       next: { revalidate: 3600 },
     });
