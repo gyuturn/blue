@@ -7,6 +7,8 @@ import { BottomSheet } from '@/components/ui/BottomSheet';
 import type { Announcement, StoredScoreData } from '@/types';
 import { getDday, getDdayBadgeStyle, getScoreTierLabel, getGeneralSupplyLabel, getSpecialSupplyLabels } from '@/lib/announcements';
 import type { AnnouncementDetail } from '@/types';
+import { useFavorites } from '@/hooks/useFavorites';
+import type { SessionUser } from '@/types/auth';
 
 const REGION_OPTIONS = [
   '전체',
@@ -46,6 +48,17 @@ export default function AnnouncementsPage() {
   const [isMock, setIsMock] = useState(false);
   const [hideExpired, setHideExpired] = useState(true);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
+  const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
+  const [activeTab, setActiveTab] = useState<'all' | 'favorites'>('all');
+
+  const { favoriteIds, toggle: toggleFavorite } = useFavorites(!!sessionUser);
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((u) => setSessionUser(u))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     try {
@@ -82,9 +95,13 @@ export default function AnnouncementsPage() {
     fetchData();
   }, [selectedRegion]);
 
-  const filteredAnnouncements = hideExpired
+  const baseAnnouncements = hideExpired
     ? announcements.filter(a => a.status !== '마감')
     : announcements;
+
+  const filteredAnnouncements = activeTab === 'favorites'
+    ? baseAnnouncements.filter(a => favoriteIds.includes(a.id))
+    : baseAnnouncements;
 
   if (!authChecked) {
     return (
@@ -157,6 +174,22 @@ export default function AnnouncementsPage() {
           </div>
         )}
 
+        {/* 전체 / 즐겨찾기 탭 */}
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all ${activeTab === 'all' ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}
+          >
+            전체 공고
+          </button>
+          <button
+            onClick={() => setActiveTab('favorites')}
+            className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-1 ${activeTab === 'favorites' ? 'bg-red-500 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}
+          >
+            <span>♥</span> 즐겨찾기 {favoriteIds.length > 0 && <span className={`text-xs px-1.5 py-0.5 rounded-full ${activeTab === 'favorites' ? 'bg-white/20' : 'bg-red-100 text-red-500'}`}>{favoriteIds.length}</span>}
+          </button>
+        </div>
+
         {/* Region Filter & Expired Toggle */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
@@ -223,28 +256,35 @@ export default function AnnouncementsPage() {
           </div>
         ) : filteredAnnouncements.length === 0 ? (
           <div className="text-center py-12">
-            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <svg
-                className="w-6 h-6 text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                />
-              </svg>
-            </div>
-            <p className="text-gray-500 font-medium">해당 지역 공고가 없습니다</p>
-            <p className="text-gray-400 text-sm mt-1">다른 지역을 선택해 보세요</p>
+            {activeTab === 'favorites' ? (
+              <>
+                <div className="text-4xl mb-3">♡</div>
+                <p className="text-gray-500 font-medium">즐겨찾기한 공고가 없어요</p>
+                <p className="text-gray-400 text-sm mt-1">마음에 드는 공고의 하트를 눌러보세요</p>
+              </>
+            ) : (
+              <>
+                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                </div>
+                <p className="text-gray-500 font-medium">해당 지역 공고가 없습니다</p>
+                <p className="text-gray-400 text-sm mt-1">다른 지역을 선택해 보세요</p>
+              </>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
             {filteredAnnouncements.map((item) => (
-              <AnnouncementCard key={item.id} announcement={item} scoreData={scoreData} onSelect={setSelectedAnnouncement} />
+              <AnnouncementCard
+                key={item.id}
+                announcement={item}
+                scoreData={scoreData}
+                onSelect={setSelectedAnnouncement}
+                isFavorite={favoriteIds.includes(item.id)}
+                onToggleFavorite={toggleFavorite}
+              />
             ))}
           </div>
         )}
@@ -286,7 +326,15 @@ function StatusBadge({ status }: { status: string | undefined }) {
   );
 }
 
-function AnnouncementCard({ announcement, scoreData, onSelect }: { announcement: Announcement; scoreData: StoredScoreData | null; onSelect: (a: Announcement) => void }) {
+function AnnouncementCard({
+  announcement, scoreData, onSelect, isFavorite, onToggleFavorite,
+}: {
+  announcement: Announcement;
+  scoreData: StoredScoreData | null;
+  onSelect: (a: Announcement) => void;
+  isFavorite: boolean;
+  onToggleFavorite: (a: Announcement) => void;
+}) {
   const dday = getDday(announcement.subscriptionStartDate, announcement.subscriptionEndDate);
   const ddayBadge = getDdayBadgeStyle(dday);
 
@@ -315,6 +363,13 @@ function AnnouncementCard({ announcement, scoreData, onSelect }: { announcement:
                 {ddayBadge.label}
               </span>
             )}
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleFavorite(announcement); }}
+              className="text-lg leading-none transition-transform active:scale-90"
+              aria-label={isFavorite ? '즐겨찾기 해제' : '즐겨찾기 추가'}
+            >
+              {isFavorite ? '♥' : '♡'}
+            </button>
           </div>
         </div>
 
