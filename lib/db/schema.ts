@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, jsonb, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, jsonb, timestamp, unique } from 'drizzle-orm/pg-core';
 
 export const subscriptionScores = pgTable('subscription_scores', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -15,3 +15,15 @@ export const subscriptionScores = pgTable('subscription_scores', {
 
 export type SubscriptionScore = typeof subscriptionScores.$inferSelect;
 export type NewSubscriptionScore = typeof subscriptionScores.$inferInsert;
+
+export const favorites = pgTable('favorites', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: text('user_id').notNull(),
+  houseManageNo: text('house_manage_no').notNull(),
+  complexName: text('complex_name').notNull(),
+  region: text('region'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [unique().on(t.userId, t.houseManageNo)]);
+
+export type Favorite = typeof favorites.$inferSelect;
+export type NewFavorite = typeof favorites.$inferInsert;
