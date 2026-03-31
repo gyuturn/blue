@@ -17,11 +17,14 @@ function setLsFavorites(ids: string[]) {
   localStorage.setItem(LS_KEY, JSON.stringify(ids));
 }
 
-export function useFavorites(isLoggedIn: boolean) {
+// isLoggedIn: true = 로그인, false = 비로그인, null = 아직 확인 중
+export function useFavorites(isLoggedIn: boolean | null) {
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
-  const [favoriteMap, setFavoriteMap] = useState<Record<string, string>>({}); // id → houseManageNo
+  const [favoriteMap, setFavoriteMap] = useState<Record<string, string>>({}); // houseManageNo → rowId
 
   useEffect(() => {
+    if (isLoggedIn === null) return; // auth 확인 중 — 아무것도 하지 않음
+
     if (isLoggedIn) {
       fetch('/api/favorites')
         .then((r) => r.json())
@@ -40,6 +43,8 @@ export function useFavorites(isLoggedIn: boolean) {
 
   const toggle = useCallback(
     async (announcement: Announcement) => {
+      if (isLoggedIn === null) return; // auth 확인 전 클릭 무시
+
       const { id: houseManageNo, complexName, region } = announcement;
       const isFav = favoriteIds.includes(houseManageNo);
 
@@ -53,8 +58,8 @@ export function useFavorites(isLoggedIn: boolean) {
       }
 
       if (isFav) {
-        // optimistic remove
         const favId = favoriteMap[houseManageNo];
+        // optimistic remove
         setFavoriteIds((prev) => prev.filter((x) => x !== houseManageNo));
         setFavoriteMap((prev) => { const n = { ...prev }; delete n[houseManageNo]; return n; });
         fetch(`/api/favorites/${favId}`, { method: 'DELETE' }).catch(() => {
