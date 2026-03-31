@@ -48,16 +48,17 @@ export default function AnnouncementsPage() {
   const [isMock, setIsMock] = useState(false);
   const [hideExpired, setHideExpired] = useState(true);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
-  const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
+  const [sessionUser, setSessionUser] = useState<SessionUser | null | undefined>(undefined);
   const [activeTab, setActiveTab] = useState<'all' | 'favorites'>('all');
 
-  const { favoriteIds, toggle: toggleFavorite } = useFavorites(!!sessionUser);
+  const authReady = sessionUser !== undefined;
+  const { favoriteIds, toggle: toggleFavorite } = useFavorites(authReady ? !!sessionUser : null);
 
   useEffect(() => {
     fetch('/api/auth/me')
       .then((r) => (r.ok ? r.json() : null))
       .then((u) => setSessionUser(u))
-      .catch(() => {});
+      .catch(() => setSessionUser(null));
   }, []);
 
   useEffect(() => {
