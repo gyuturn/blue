@@ -10,6 +10,7 @@ import type { EligibilityInput, StoredScoreData } from '@/types';
 function ResultContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const [showTable, setShowTable] = useState(false);
 
   const data = useMemo(() => {
     const dataParam = searchParams.get('data');
@@ -52,8 +53,6 @@ function ResultContent() {
       </div>
     );
   }
-
-  const [showTable, setShowTable] = useState(false);
 
   const { scoreResult, specialSupply, input } = data;
 
