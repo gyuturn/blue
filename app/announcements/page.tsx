@@ -9,6 +9,7 @@ import { getDday, getDdayBadgeStyle, getScoreTierLabel, getGeneralSupplyLabel, g
 import type { AnnouncementDetail } from '@/types';
 import { useFavorites } from '@/hooks/useFavorites';
 import type { SessionUser } from '@/types/auth';
+import { calculateTotalScore, calculateSpecialSupply } from '@/lib/calculator';
 
 const REGION_OPTIONS = [
   '전체',
@@ -50,6 +51,7 @@ export default function AnnouncementsPage() {
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
   const [sessionUser, setSessionUser] = useState<SessionUser | null | undefined>(undefined);
   const [activeTab, setActiveTab] = useState<'all' | 'favorites'>('all');
+  const [scoreFromDB, setScoreFromDB] = useState(false);
 
   const authReady = sessionUser !== undefined;
   const { favoriteIds, toggle: toggleFavorite } = useFavorites(authReady ? !!sessionUser : null);
@@ -62,19 +64,45 @@ export default function AnnouncementsPage() {
   }, []);
 
   useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem('scoreData');
-      if (!raw) {
-        router.push('/calculator');
-        return;
-      }
-      const parsed: StoredScoreData = JSON.parse(raw);
-      setScoreData(parsed);
-    } catch {
+    const loadScore = async () => {
+      // 1) sessionStorage 우선
+      try {
+        const raw = sessionStorage.getItem('scoreData');
+        if (raw) {
+          setScoreData(JSON.parse(raw));
+          setAuthChecked(true);
+          return;
+        }
+      } catch {}
+
+      // 2) 로그인 상태면 DB에서 최근 점수 로드
+      try {
+        const meRes = await fetch('/api/auth/me');
+        if (meRes.ok) {
+          const latestRes = await fetch('/api/scores/latest');
+          if (latestRes.ok) {
+            const latest = await latestRes.json();
+            const input = latest.inputSnapshot as StoredScoreData['input'];
+            const scoreData: StoredScoreData = {
+              input,
+              result: calculateTotalScore(input),
+              specialSupply: calculateSpecialSupply(input),
+              savedAt: new Date(latest.createdAt).getTime(),
+            };
+            sessionStorage.setItem('scoreData', JSON.stringify(scoreData));
+            setScoreData(scoreData);
+            setScoreFromDB(true);
+            setAuthChecked(true);
+            return;
+          }
+        }
+      } catch {}
+
+      // 3) 둘 다 없으면 계산기로
       router.push('/calculator');
-    } finally {
-      setAuthChecked(true);
-    }
+    };
+
+    loadScore();
   }, [router]);
 
   useEffect(() => {
@@ -154,6 +182,21 @@ export default function AnnouncementsPage() {
             )}
           </div>
         </div>
+
+        {/* 저장된 점수 사용 배너 */}
+        {scoreFromDB && scoreData && (
+          <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-3 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-amber-600">📋</span>
+              <span className="text-amber-700 font-medium">
+                {new Date(scoreData.savedAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} 저장된 점수로 보는 중
+              </span>
+            </div>
+            <button onClick={() => router.push('/calculator')} className="text-xs text-amber-700 font-semibold underline">
+              재계산
+            </button>
+          </div>
+        )}
 
         {/* Score Summary Bar */}
         {scoreData && (
