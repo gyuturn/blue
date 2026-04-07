@@ -98,8 +98,8 @@ export default function AnnouncementsPage() {
         }
       } catch {}
 
-      // 3) 둘 다 없으면 계산기로
-      router.push('/calculator');
+      // 3) 둘 다 없으면 점수 없이 공고 표시
+      setAuthChecked(true);
     };
 
     loadScore();
@@ -194,6 +194,22 @@ export default function AnnouncementsPage() {
             </div>
             <button onClick={() => router.push('/calculator')} className="text-xs text-amber-700 font-semibold underline">
               재계산
+            </button>
+          </div>
+        )}
+
+        {/* 가점 유도 배너 (점수 없을 때) */}
+        {!scoreData && (
+          <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-4">
+            <div className="flex items-center gap-2">
+              <span className="text-blue-500">📊</span>
+              <span className="text-sm text-blue-700">가점을 입력하면 맞춤 공고를 볼 수 있어요</span>
+            </div>
+            <button
+              onClick={() => router.push('/calculator')}
+              className="text-xs font-semibold text-white bg-blue-600 px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap"
+            >
+              가점 입력
             </button>
           </div>
         )}
