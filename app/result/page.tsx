@@ -321,7 +321,7 @@ function SpecialBadge({
 }) {
   return (
     <div
-      className={`flex items-center justify-between p-3 rounded-xl ${
+      className={`flex items-start justify-between gap-2 p-3 rounded-xl ${
         eligible ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'
       }`}
     >

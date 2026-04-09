@@ -172,8 +172,12 @@ export default async function HomePage() {
               <span className="text-2xl font-bold text-blue-700">{latestScore.totalScore}점</span>
               <span className="text-xs text-gray-400">{new Date(latestScore.createdAt).toLocaleDateString('ko-KR')}</span>
             </div>
-            <div className="text-xs text-gray-500 mt-1">
-              무주택 {latestScore.housingScore}점 · 부양가족 {latestScore.dependentScore}점 · 청약통장 {latestScore.subscriptionScore}점
+            <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-gray-500 mt-1">
+              <span>무주택 {latestScore.housingScore}점</span>
+              <span>·</span>
+              <span>부양가족 {latestScore.dependentScore}점</span>
+              <span>·</span>
+              <span>청약통장 {latestScore.subscriptionScore}점</span>
             </div>
           </div>
         )}
