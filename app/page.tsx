@@ -200,6 +200,35 @@ export default async function HomePage() {
           </Link>
         </div>
 
+        {/* Guide CTA */}
+        <div className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-5 border border-blue-100">
+          <p className="text-sm font-bold text-gray-800 mb-1">
+            청약이 처음이신가요?
+          </p>
+          <p className="text-xs text-gray-500 mb-3">
+            용어부터 절차까지, 청약의 모든 것을 쉽게 알려드립니다.
+          </p>
+          <Link
+            href="/guide"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+          >
+            입문 가이드 보기
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
+          </Link>
+        </div>
+
         <Disclaimer />
       </div>
     </main>

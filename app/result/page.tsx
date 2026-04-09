@@ -5,6 +5,8 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Suspense } from 'react';
 import Disclaimer from '@/components/Disclaimer';
 import { calculateTotalScore, calculateSpecialSupply } from '@/lib/calculator';
+import Tooltip from '@/components/Tooltip';
+import { TERM_MAP } from '@/lib/terms';
 import type { EligibilityInput, StoredScoreData } from '@/types';
 import type { SessionUser } from '@/types/auth';
 
@@ -101,19 +103,22 @@ function ResultContent() {
 
   const scoreItems = [
     {
-      label: '무주택 기간',
+      label: <><Tooltip term={TERM_MAP.mujiutaekGigan.term} definition={TERM_MAP.mujiutaekGigan.shortDef}>무주택 기간</Tooltip></>,
+      labelText: '무주택 기간',
       score: scoreResult.homelessScore,
       maxScore: 32,
       description: input.isHomeless ? `${input.homelessYears}년` : '해당 없음',
     },
     {
-      label: '부양가족 수',
+      label: <><Tooltip term={TERM_MAP.buyangGajok.term} definition={TERM_MAP.buyangGajok.shortDef}>부양가족 수</Tooltip></>,
+      labelText: '부양가족 수',
       score: scoreResult.dependentsScore,
       maxScore: 35,
       description: `${input.dependentsCount}명`,
     },
     {
-      label: '청약통장 가입기간',
+      label: <><Tooltip term={TERM_MAP.tongjanG.term} definition={TERM_MAP.tongjanG.shortDef}>청약통장</Tooltip> 가입기간</>,
+      labelText: '청약통장 가입기간',
       score: scoreResult.subscriptionScore,
       maxScore: 17,
       description: input.subscriptionStartDate || '미입력',
@@ -209,10 +214,10 @@ function ResultContent() {
 
         {/* Score Breakdown */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-4">
-          <h2 className="text-base font-bold text-gray-900 mb-4">항목별 점수</h2>
+          <h2 className="text-base font-bold text-gray-900 mb-4"><Tooltip term={TERM_MAP.gajum.term} definition={TERM_MAP.gajum.shortDef}>가점제</Tooltip> 항목별 점수</h2>
           <div className="space-y-4">
             {scoreItems.map((item) => (
-              <div key={item.label}>
+              <div key={item.labelText}>
                 <div className="flex justify-between items-center mb-1.5">
                   <div>
                     <span className="text-sm font-semibold text-gray-800">
@@ -245,11 +250,11 @@ function ResultContent() {
         {/* Special Supply Eligibility */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-4">
           <h2 className="text-base font-bold text-gray-900 mb-4">
-            특별공급 자격 여부
+            <Tooltip term={TERM_MAP.teukbyeol.term} definition={TERM_MAP.teukbyeol.shortDef}>특별공급</Tooltip> 자격 여부
           </h2>
           <div className="space-y-2">
             <SpecialBadge
-              label="신혼부부 특별공급"
+              label={<><Tooltip term={TERM_MAP.sinholBubu.term} definition={TERM_MAP.sinholBubu.shortDef}>신혼부부 특별공급</Tooltip></>}
               eligible={specialSupply.newlyWed}
               description={
                 !input.isMarried
@@ -268,12 +273,12 @@ function ResultContent() {
               }
             />
             <SpecialBadge
-              label="생애최초 특별공급"
+              label={<><Tooltip term={TERM_MAP.saengaeCheot.term} definition={TERM_MAP.saengaeCheot.shortDef}>생애최초 특별공급</Tooltip></>}
               eligible={specialSupply.firstHome}
               description="무주택 + 납입 12회 이상"
             />
             <SpecialBadge
-              label="다자녀 특별공급"
+              label={<><Tooltip term={TERM_MAP.daJanyeo.term} definition={TERM_MAP.daJanyeo.shortDef}>다자녀 특별공급</Tooltip></>}
               eligible={specialSupply.multiChild}
               description={`미성년 자녀 ${input.childrenCount ?? 0}명${specialSupply.multiChild ? ' → 자격 있음' : ' (3명 이상 필요)'}`}
             />
@@ -310,7 +315,7 @@ function SpecialBadge({
   eligible,
   description,
 }: {
-  label: string;
+  label: React.ReactNode;
   eligible: boolean;
   description: string;
 }) {

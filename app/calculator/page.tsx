@@ -629,7 +629,7 @@ function Step5({
         </Tooltip>
       </h2>
       <p className="text-gray-500 text-sm mb-5">
-        특별공급 자격 판정에 사용됩니다.
+        <Tooltip content="신혼부부·다자녀 등 정책 대상에게 별도 물량을 우선 공급"><span className="underline decoration-dotted decoration-blue-400 cursor-help text-blue-700">특별공급</span></Tooltip> 자격 판정에 사용됩니다.
       </p>
 
       <div className="space-y-4">
