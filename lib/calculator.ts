@@ -111,9 +111,14 @@ export function calculateSubscriptionScore(startDate: string): number {
  * 총점 = 무주택(0~32) + 부양가족(0~35) + 청약통장(0~17) = 0~84점
  */
 export function calculateTotalScore(input: EligibilityInput): ScoreResult {
-  const homelessScore = input.isHomeless
-    ? calculateHomelessScore(input.homelessYears)
-    : 0;
+  let homelessScore = 0;
+  if (input.isHomeless) {
+    // 만 30세 미만 미혼은 산정 불가 → 0점 (정책: 주택공급에관한규칙)
+    const startDate = calcHomelessStartDate(input.birthDate, input.isMarried, input.marriageDate);
+    if (startDate !== null) {
+      homelessScore = calculateHomelessScore(input.homelessYears);
+    }
+  }
   const dependentsScore = calculateDependentsScore(input.dependentsCount);
   const subscriptionScore = calculateSubscriptionScore(input.subscriptionStartDate);
   const totalScore = homelessScore + dependentsScore + subscriptionScore;
