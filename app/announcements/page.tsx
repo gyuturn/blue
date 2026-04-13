@@ -10,6 +10,8 @@ import type { AnnouncementDetail } from '@/types';
 import { useFavorites } from '@/hooks/useFavorites';
 import type { SessionUser } from '@/types/auth';
 import { calculateTotalScore, calculateSpecialSupply } from '@/lib/calculator';
+import Tooltip from '@/components/Tooltip';
+import { TERM_MAP } from '@/lib/terms';
 
 const REGION_OPTIONS = [
   '전체',
@@ -216,8 +218,8 @@ export default function AnnouncementsPage() {
 
         {/* Score Summary Bar */}
         {scoreData && (
-          <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-4">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-4">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm text-gray-600">내 가점</span>
               <span className="text-lg font-bold text-blue-700">{scoreData.result.totalScore}점</span>
               <span className="text-xs text-gray-500">/ 84점</span>
@@ -264,12 +266,12 @@ export default function AnnouncementsPage() {
               </button>
             </div>
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+          <div className="flex flex-wrap gap-2">
             {REGION_OPTIONS.map((region) => (
               <button
                 key={region}
                 onClick={() => setSelectedRegion(region)}
-                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   selectedRegion === region
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
@@ -434,28 +436,28 @@ function AnnouncementCard({
         </div>
 
         <div className="space-y-1.5 text-xs text-gray-600">
-          <div className="flex items-center gap-2">
+          <div className="flex items-start gap-2">
             <span className="text-gray-400 w-14 flex-shrink-0">건설사</span>
-            <span className="font-medium">{announcement.builder}</span>
+            <span className="font-medium min-w-0 break-words">{announcement.builder}</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-start gap-2">
             <span className="text-gray-400 w-14 flex-shrink-0">지역</span>
-            <span>{announcement.region}</span>
+            <span className="min-w-0 break-words">{announcement.region}</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-start gap-2">
             <span className="text-gray-400 w-14 flex-shrink-0">유형</span>
-            <span>{announcement.houseType}</span>
+            <span className="min-w-0 break-words">{announcement.houseType}</span>
           </div>
           {announcement.totalHouseholds !== undefined && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-start gap-2">
               <span className="text-gray-400 w-14 flex-shrink-0">세대수</span>
               <span>{announcement.totalHouseholds.toLocaleString()}세대</span>
             </div>
           )}
           {announcement.subscriptionStartDate && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-start gap-2">
               <span className="text-gray-400 w-14 flex-shrink-0">접수기간</span>
-              <span>
+              <span className="min-w-0 break-words">
                 {announcement.subscriptionStartDate} ~{' '}
                 {announcement.subscriptionEndDate}
               </span>
@@ -634,25 +636,16 @@ function AnnouncementDetail({ announcement, scoreData }: { announcement: Announc
           {detail.units.length > 0 && (
             <div className="mb-4">
               <SectionLabel>주택형별 공급</SectionLabel>
-              <div className="mt-3 rounded-xl overflow-hidden border border-gray-100">
-                <table className="w-full text-xs">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="text-left px-3 py-2 text-gray-500 font-semibold">주택형</th>
-                      <th className="text-right px-3 py-2 text-gray-500 font-semibold">세대수</th>
-                      <th className="text-right px-3 py-2 text-gray-500 font-semibold">분양가(만원)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {detail.units.map((u, i) => (
-                      <tr key={i} className="bg-white">
-                        <td className="px-3 py-2.5 text-gray-800 font-medium">{u.type}</td>
-                        <td className="px-3 py-2.5 text-gray-700 text-right">{u.totalCount || '-'}</td>
-                        <td className="px-3 py-2.5 text-gray-700 text-right">{u.price || '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="mt-3 space-y-2">
+                {detail.units.map((u, i) => (
+                  <div key={i} className="rounded-xl border border-gray-100 bg-white px-3 py-2.5">
+                    <p className="text-xs font-semibold text-gray-800 mb-1">{u.type}</p>
+                    <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-600">
+                      <span>세대수 <span className="font-medium text-gray-800">{u.totalCount || '-'}</span></span>
+                      <span>분양가 <span className="font-medium text-gray-800">{u.price ? `${u.price}만원` : '-'}</span></span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
