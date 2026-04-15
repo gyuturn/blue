@@ -66,3 +66,23 @@
 - `feature/issue-[번호]-[설명]`
 - `bugfix/issue-[번호]-[설명]`
 - `hotfix/issue-[번호]-[설명]`
+
+---
+
+## 이슈 관리 규칙
+
+### PR 머지 후 반드시 이슈 close
+- PR 머지가 완료되면 연관된 GitHub 이슈를 즉시 close한다.
+- PR body에 `Closes #번호` 를 명시하거나, 머지 후 수동으로 close한다.
+
+```bash
+gh issue close [번호] --repo gyuturn/blue --comment "PR #[PR번호]에서 구현 완료"
+```
+
+### 세션 시작 시 이슈 정리
+- 새 세션에서 작업 전, 이미 구현 완료된 open 이슈가 있는지 확인하고 close한다.
+- `gh issue list --state open` 으로 목록 조회 후 git log와 대조한다.
+
+### PR base 브랜치 확인
+- PR 생성 시 base 브랜치가 반드시 `main`인지 확인한다.
+- 잘못된 경우: `gh pr edit [번호] --base main`으로 수정 후 머지.
