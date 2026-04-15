@@ -21,6 +21,7 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: 'black-translucent',
     title: '청약 가이드',
+    startupImage: '/apple-touch-icon.png',
   },
   formatDetection: {
     telephone: false,
