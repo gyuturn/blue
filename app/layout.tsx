@@ -17,6 +17,17 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "청약 매칭 가이드",
   description: "나에게 맞는 청약을 쉽게 찾아보세요",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: '청약 가이드',
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
+  },
 };
 
 export default function RootLayout({
