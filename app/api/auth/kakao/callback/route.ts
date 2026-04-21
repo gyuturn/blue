@@ -3,6 +3,8 @@ import { exchangeCodeForToken, getKakaoUser } from '@/lib/auth/kakao';
 import { setSession } from '@/lib/auth/session';
 import type { TokenData } from '@/types/auth';
 
+const TERMS_AGREED_COOKIE = 'blue_terms_agreed';
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
@@ -29,6 +31,13 @@ export async function GET(request: NextRequest) {
     };
 
     await setSession(user, tokens);
+
+    // 약관 동의 여부 확인 — 미동의 시 동의 화면으로
+    const termsAgreed = request.cookies.get(TERMS_AGREED_COOKIE)?.value;
+    if (!termsAgreed) {
+      return NextResponse.redirect(new URL('/agree', request.url));
+    }
+
     return NextResponse.redirect(new URL('/', request.url));
   } catch (err) {
     console.error('[Kakao callback error]', err);
