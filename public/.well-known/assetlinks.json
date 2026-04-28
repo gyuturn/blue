@@ -1,12 +1,8 @@
-[
-  {
-    "relation": ["delegate_permission/common.handle_all_urls"],
-    "target": {
-      "namespace": "android_app",
-      "package_name": "com.blue.cheongyak",
-      "sha256_cert_fingerprints": [
-        "REPLACE_WITH_SHA256_FROM_PLAY_CONSOLE"
-      ]
-    }
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.blue.cheongyak",
+    "sha256_cert_fingerprints": ["B1:48:9F:A6:47:8B:C2:AC:30:CD:98:E6:34:52:EE:C2:C6:CD:86:A9:0F:A3:CC:DC:2C:5A:BB:92:48:47:BB:A8"]
   }
-]
+}]
