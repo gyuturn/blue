@@ -46,7 +46,7 @@ export default function AnnouncementsPage() {
 
   useEffect(() => {
     try {
-      const raw = sessionStorage.getItem('scoreData');
+      const raw = localStorage.getItem('scoreData');
       if (!raw) {
         router.push('/calculator');
         return;
@@ -284,7 +284,7 @@ function AnnouncementCard({ announcement, scoreData }: { announcement: Announcem
 
   const handleCardClick = () => {
     try {
-      sessionStorage.setItem('selectedAnnouncement', JSON.stringify(announcement));
+      localStorage.setItem('selectedAnnouncement', JSON.stringify(announcement));
     } catch {}
     router.push(`/announcements/${announcement.id}`);
   };

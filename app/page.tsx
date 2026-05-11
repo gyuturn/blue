@@ -1,9 +1,11 @@
 import Link from 'next/link';
 import Disclaimer from '@/components/Disclaimer';
+import TermsModal from '@/components/TermsModal';
 
 export default function HomePage() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+      <TermsModal />
       <div className="max-w-md mx-auto px-4 py-12">
         {/* Hero Section */}
         <div className="text-center mb-10">

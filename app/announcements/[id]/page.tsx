@@ -12,7 +12,7 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
 
   const announcement = useMemo((): Announcement | null => {
     try {
-      const stored = sessionStorage.getItem('selectedAnnouncement');
+      const stored = localStorage.getItem('selectedAnnouncement');
       if (!stored) return null;
       const parsed = JSON.parse(stored) as Announcement;
       return parsed.id === id ? parsed : null;
@@ -23,7 +23,7 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
 
   const scoreData = useMemo((): StoredScoreData | null => {
     try {
-      const stored = sessionStorage.getItem('scoreData');
+      const stored = localStorage.getItem('scoreData');
       return stored ? (JSON.parse(stored) as StoredScoreData) : null;
     } catch {
       return null;

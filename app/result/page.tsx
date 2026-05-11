@@ -39,7 +39,7 @@ function ResultContent() {
       savedAt: Date.now(),
     };
     try {
-      sessionStorage.setItem('scoreData', JSON.stringify(scoreData));
+      localStorage.setItem('scoreData', JSON.stringify(scoreData));
     } catch {}
   }, [data, router]);
 
