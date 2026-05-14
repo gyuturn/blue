@@ -50,6 +50,14 @@ export interface StoredScoreData {
 // 청약 접수 상태 타입
 export type SubscriptionStatus = '접수중' | '접수예정' | '마감';
 
+// 주택형별 공급 정보 타입
+export interface HouseType {
+  houseTypeName: string;  // 예: "59.95㎡"
+  supplyCount: number;    // 공급 세대수
+  price: number | null;   // 만원 단위, null이면 미공개
+  priceDisplay: string;   // 예: "20억 2,600만원"
+}
+
 // 청약 공고 타입
 export interface Announcement {
   id: string;

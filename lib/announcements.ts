@@ -1,4 +1,4 @@
-import type { Announcement, EligibilityInput, SpecialSupplyEligibility, SubscriptionStatus } from '@/types';
+import type { Announcement, EligibilityInput, HouseType, SpecialSupplyEligibility, SubscriptionStatus } from '@/types';
 
 // API 응답 날짜는 이미 YYYY-MM-DD 형식으로 반환됨
 function formatDate(date: string): string {
@@ -204,6 +204,94 @@ export function getSpecialSupplyLabels(
   if (firstHome) labels.push('생애최초 특공 가능');
   if (multiChild) labels.push('다자녀 특공 가능');
   return labels;
+}
+
+// 주택형 파싱: "059.9500" → "59.95㎡"
+export function parseHouseTy(raw: string): string {
+  if (!raw) return '';
+  const num = parseFloat(raw);
+  if (isNaN(num)) return raw;
+  // 소수점 불필요한 0 제거 후 ㎡ 단위 추가
+  const formatted = num % 1 === 0 ? num.toFixed(0) : String(parseFloat(num.toFixed(4)));
+  return `${formatted}㎡`;
+}
+
+// 분양가 파싱: "2026000187(02)" → { value: 202600, display: "20억 2,600만원" }
+export function parseLttotTopAmount(raw: string): { value: number | null; display: string } {
+  if (!raw || raw.trim() === '') return { value: null, display: '미공개' };
+
+  // 숫자만 추출 (괄호 및 부가코드 제거)
+  const numericStr = raw.replace(/[^0-9]/g, '');
+  if (!numericStr) return { value: null, display: '미공개' };
+
+  const wonAmount = Number(numericStr);
+  if (isNaN(wonAmount) || wonAmount <= 0) return { value: null, display: '미공개' };
+
+  // 원 → 만원
+  const manwon = Math.round(wonAmount / 10000);
+
+  let display: string;
+  if (manwon >= 10000) {
+    const eok = Math.floor(manwon / 10000);
+    const rem = manwon % 10000;
+    if (rem === 0) {
+      display = `${eok.toLocaleString()}억원`;
+    } else {
+      display = `${eok.toLocaleString()}억 ${rem.toLocaleString()}만원`;
+    }
+  } else {
+    display = `${manwon.toLocaleString()}만원`;
+  }
+
+  return { value: manwon, display };
+}
+
+// 주택형별 공급 정보 API 호출 (서버에서만 사용)
+export async function fetchHouseTypesFromAPI(houseManageNo: string): Promise<HouseType[]> {
+  const apiKey = process.env.PUBLIC_DATA_API_KEY;
+  if (!apiKey) return [];
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+  try {
+    const baseUrl =
+      'https://api.odcloud.kr/api/ApplyhomeInfoDetailSvc/v1/getAPTLttotPblancMdl';
+    const queryString = `page=1&perPage=50&returnType=JSON&serviceKey=${apiKey}&cond[HOUSE_MANAGE_NO::EQ]=${encodeURIComponent(houseManageNo)}`;
+
+    const response = await fetch(`${baseUrl}?${queryString}`, {
+      signal: controller.signal,
+      cache: 'no-store',
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      console.error(`[API] house-types error: ${response.status}`);
+      return [];
+    }
+
+    const json = await response.json();
+    const items: Record<string, string>[] = json?.data ?? [];
+
+    return items.map((item): HouseType => {
+      const parsed = parseLttotTopAmount(item.LTTOT_TOP_AMOUNT ?? '');
+      return {
+        houseTypeName: parseHouseTy(item.HOUSE_TY ?? ''),
+        supplyCount: Number(item.SUPLY_HSHLDCO ?? 0),
+        price: parsed.value,
+        priceDisplay: parsed.display,
+      };
+    });
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.warn('[API] house-types timeout');
+    } else {
+      console.error('[API] house-types unexpected error:', error);
+    }
+    return [];
+  }
 }
 
 // Mock 데이터
