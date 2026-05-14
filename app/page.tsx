@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { subscriptionScores } from '@/lib/db/schema';
 import { eq, desc } from 'drizzle-orm';
 import type { SubscriptionScore } from '@/lib/db/schema';
+import TermsModal from '@/components/TermsModal';
 
 async function getLatestScore(userId: string): Promise<SubscriptionScore | null> {
   try {
@@ -26,6 +27,7 @@ export default async function HomePage() {
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+      <TermsModal />
       <div className="max-w-md mx-auto px-4 py-12">
         {/* Hero Section */}
         <div className="text-center mb-10">
