@@ -1,9 +1,9 @@
 'use client';
 
-import { use, useEffect, useMemo } from 'react';
+import { use, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Disclaimer from '@/components/Disclaimer';
-import type { Announcement, StoredScoreData } from '@/types';
+import type { Announcement, HouseType, StoredScoreData } from '@/types';
 import { getDday, getDdayBadgeStyle, getScoreTierLabel, getGeneralSupplyLabel, getSpecialSupplyLabels } from '@/lib/announcements';
 import { Tooltip } from '@/components/ui/Tooltip';
 
@@ -31,11 +31,30 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
     }
   }, []);
 
+  const [houseTypes, setHouseTypes] = useState<HouseType[]>([]);
+  const [houseTypesLoading, setHouseTypesLoading] = useState(false);
+
   useEffect(() => {
     if (!announcement) {
       router.push('/announcements');
     }
   }, [announcement, router]);
+
+  useEffect(() => {
+    if (!id) return;
+    setHouseTypesLoading(true);
+    fetch(`/api/announcements/${id}/house-types`)
+      .then((res) => res.json())
+      .then((json) => {
+        setHouseTypes(Array.isArray(json.data) ? json.data : []);
+      })
+      .catch(() => {
+        setHouseTypes([]);
+      })
+      .finally(() => {
+        setHouseTypesLoading(false);
+      });
+  }, [id]);
 
   if (!announcement) {
     return (
@@ -140,6 +159,48 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-500">총 공급 세대수</span>
               <span className="font-bold text-gray-900">{announcement.totalHouseholds.toLocaleString()}세대</span>
+            </div>
+          </div>
+        )}
+
+        {/* 주택형별 공급 정보 */}
+        {houseTypesLoading && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
+            <h2 className="text-sm font-bold text-gray-700 mb-4">주택형별 공급 정보</h2>
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-8 bg-gray-100 rounded animate-pulse" />
+              ))}
+            </div>
+          </div>
+        )}
+        {!houseTypesLoading && houseTypes.length > 0 && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
+            <div className="flex items-center gap-2 mb-4">
+              <h2 className="text-sm font-bold text-gray-700">주택형별 공급 정보</h2>
+              <Tooltip content="전용면적: 실제 거주 공간의 면적(베란다 제외). 분양가: 청약 당첨 시 납부 금액. 상세 내용은 공고문을 확인하세요.">
+                <span className="text-blue-400 font-normal cursor-help text-xs" aria-label="도움말">분양가 ⓘ</span>
+              </Tooltip>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-xs text-gray-500 border-b border-gray-100">
+                    <th className="text-left pb-2 font-medium">전용면적</th>
+                    <th className="text-right pb-2 font-medium">세대수</th>
+                    <th className="text-right pb-2 font-medium">분양가</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {houseTypes.map((ht, idx) => (
+                    <tr key={idx} className="py-2">
+                      <td className="py-2.5 text-gray-800 font-medium">{ht.houseTypeName}</td>
+                      <td className="py-2.5 text-right text-gray-700">{ht.supplyCount.toLocaleString()}세대</td>
+                      <td className="py-2.5 text-right text-gray-700">{ht.priceDisplay}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
