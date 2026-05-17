@@ -17,6 +17,15 @@ function extractThTd(html: string, thText: string): string {
   return m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+function cleanPrice(raw: string): string {
+  // 앞부분 숫자만 추출 (예: "2026000120(02)" → "2026000120")
+  const match = raw.match(/^[\d,]+/);
+  if (!match) return '';
+  const num = parseInt(match[0].replace(/,/g, ''), 10);
+  if (isNaN(num)) return '';
+  return num.toLocaleString('ko-KR');
+}
+
 function extractTableRows(html: string, headerKeyword: string): string[][] {
   // Find table that contains a th with headerKeyword
   const tableRe = /<table[\s\S]*?<\/table>/gi;
@@ -94,10 +103,10 @@ export async function GET(request: Request) {
     const units = unitRows
       .filter((row) => row[0] && /^\d/.test(row[0]))
       .map((row) => ({
-        type: row[0] ?? '',
+        type: (row[0] ?? '').trim(),
         supplyArea: row[1] ?? '',
         totalCount: row[4] ?? row[3] ?? '',
-        price: row[5] ?? row[6] ?? '',
+        price: cleanPrice(row[5] ?? row[6] ?? ''),
       }));
 
     const detail: AnnouncementDetail = {
