@@ -34,6 +34,16 @@ const REGION_OPTIONS = [
   '제주특별자치도',
 ];
 
+function formatPriceKorean(raw: string): string {
+  const num = parseInt(raw.replace(/,/g, ''), 10);
+  if (isNaN(num) || num <= 0) return '-';
+  const 억 = Math.floor(num / 10000);
+  const 만 = num % 10000;
+  if (억 > 0 && 만 > 0) return `${억}억 ${만.toLocaleString('ko-KR')}만원`;
+  if (억 > 0) return `${억}억`;
+  return `${만.toLocaleString('ko-KR')}만원`;
+}
+
 const tierBadgeStyle: Record<string, string> = {
   S: 'bg-yellow-100 text-yellow-700',
   A: 'bg-blue-100 text-blue-700',
@@ -642,7 +652,7 @@ function AnnouncementDetail({ announcement, scoreData }: { announcement: Announc
                     <p className="text-xs font-semibold text-gray-800 mb-1">{u.type}</p>
                     <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-600">
                       <span>세대수 <span className="font-medium text-gray-800">{u.totalCount || '-'}</span></span>
-                      <span>분양가 <span className="font-medium text-gray-800">{u.price ? `${u.price}만원` : '-'}</span></span>
+                      <span>분양가 <span className="font-medium text-gray-800">{u.price ? formatPriceKorean(u.price) : '-'}</span></span>
                     </div>
                   </div>
                 ))}
