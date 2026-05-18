@@ -58,6 +58,11 @@ export default function AnnouncementsPage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRegion, setSelectedRegion] = useState('전체');
+
+  useEffect(() => {
+    const saved = localStorage.getItem('preferred_region');
+    if (saved && REGION_OPTIONS.includes(saved)) setSelectedRegion(saved);
+  }, []);
   const [isMock, setIsMock] = useState(false);
   const [hideExpired, setHideExpired] = useState(true);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
@@ -276,12 +281,15 @@ export default function AnnouncementsPage() {
               </button>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex overflow-x-auto gap-2 pb-1 scrollbar-hide">
             {REGION_OPTIONS.map((region) => (
               <button
                 key={region}
-                onClick={() => setSelectedRegion(region)}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                onClick={() => {
+                  setSelectedRegion(region);
+                  localStorage.setItem('preferred_region', region);
+                }}
+                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   selectedRegion === region
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
