@@ -1,37 +1,41 @@
 {
   "project": {
-    "name": "AI Stock Recommendation",
-    "description": "AI 기반 주식 매수/매도 추천 시스템",
-    "repository": "https://github.com/gyuturn/stock"
+    "name": "Blue",
+    "description": "청약 가점 계산 및 공고 큐레이션 서비스",
+    "repository": "https://github.com/gyuturn/blue"
   },
   "permissions": {
     "allow": [
       "Bash(gh:*)",
       "Bash(git:*)",
-      "Bash(mvn:*)",
-      "Bash(gradle:*)",
       "Bash(npm:*)",
-      "Bash(yarn:*)",
-      "Bash(java:*)",
-      "Read(/Users/kimgyumin/Desktop/dev/blue/.env.local)",
-      "Edit(/Users/kimgyumin/Desktop/dev/blue/.env.local)"
+      "Bash(npx:*)"
     ]
   },
   "techStack": {
-    "backend": {
-      "language": "Java",
-      "framework": "Spring Boot",
-      "orm": "JPA"
-    },
     "frontend": {
-      "framework": "Vue.js"
+      "framework": "Next.js 16 (App Router)",
+      "language": "TypeScript",
+      "styling": "Tailwind CSS v4"
     },
-    "ci_cd": "GitHub Actions"
+    "backend": "Next.js API Routes (app/api/*)",
+    "database": "Supabase (PostgreSQL) + Drizzle ORM",
+    "auth": "Kakao OAuth",
+    "deployment": "Vercel (GitHub Actions CD: .github/workflows/cd.yml)",
+    "ci_cd": "GitHub Actions (CI: pull_request 빌드+lint, CD: main push 시 Vercel 배포)"
   },
+  "_note_agents": "아래 orchestrators는 command/playbook(인라인)이고, subagents(code-reviewer/impact-analyst/deploy-checker)만 frontmatter를 갖춘 실제 위임 서브에이전트다. 상세: docs/agents/agent-system-design.md",
   "agents": {
-    "pm": ".claude/agents/pm.md",
-    "planner": ".claude/agents/planner.md",
-    "cto": ".claude/agents/cto.md",
-    "developer": ".claude/agents/developer.md"
+    "orchestrators": {
+      "pm": ".claude/agents/pm.md",
+      "planner": ".claude/agents/planner.md",
+      "cto": ".claude/agents/cto.md",
+      "developer": ".claude/agents/developer.md"
+    },
+    "subagents": {
+      "code-reviewer": ".claude/agents/code-reviewer.md",
+      "impact-analyst": ".claude/agents/impact-analyst.md",
+      "deploy-checker": ".claude/agents/deploy-checker.md"
+    }
   }
 }
