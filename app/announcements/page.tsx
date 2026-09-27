@@ -12,6 +12,8 @@ import type { SessionUser } from '@/types/auth';
 import { calculateTotalScore, calculateSpecialSupply } from '@/lib/calculator';
 import Tooltip from '@/components/Tooltip';
 import { TERM_MAP } from '@/lib/terms';
+import { readLocalStorage } from '@/hooks/useLocalStorage';
+import { LAST_SCORE_KEY, parseSavedScore, toStoredScoreData } from '@/lib/scoreStorage';
 
 const REGION_OPTIONS = [
   '전체',
@@ -92,7 +94,19 @@ export default function AnnouncementsPage() {
         }
       } catch {}
 
-      // 2) 로그인 상태면 DB에서 최근 점수 로드
+      // 2) 이 기기에 저장된 마지막 점수
+      const saved = parseSavedScore(readLocalStorage(LAST_SCORE_KEY));
+      if (saved) {
+        const fromDevice = toStoredScoreData(saved.input, saved.savedAt);
+        try {
+          sessionStorage.setItem('scoreData', JSON.stringify(fromDevice));
+        } catch {}
+        setScoreData(fromDevice);
+        setAuthChecked(true);
+        return;
+      }
+
+      // 3) 로그인 상태면 DB에서 최근 점수 로드
       try {
         const meRes = await fetch('/api/auth/me');
         if (meRes.ok) {
@@ -115,7 +129,7 @@ export default function AnnouncementsPage() {
         }
       } catch {}
 
-      // 3) 둘 다 없으면 점수 없이 공고 표시
+      // 4) 모두 없으면 점수 없이 공고 표시
       setAuthChecked(true);
     };
 

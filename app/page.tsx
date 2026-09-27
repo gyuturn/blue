@@ -1,12 +1,16 @@
 import Link from 'next/link';
 import Disclaimer from '@/components/Disclaimer';
+import LastScoreCard from '@/components/home/LastScoreCard';
 import { getSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { subscriptionScores } from '@/lib/db/schema';
+import { isEligibilityInput } from '@/lib/scoreStorage';
 import { eq, desc } from 'drizzle-orm';
-import type { SubscriptionScore } from '@/lib/db/schema';
+import type { EligibilityInput } from '@/types';
 
-async function getLatestScore(userId: string): Promise<SubscriptionScore | null> {
+async function getLatestServerRecord(
+  userId: string,
+): Promise<{ input: EligibilityInput; savedAt: number } | null> {
   try {
     const [latest] = await db
       .select()
@@ -14,7 +18,8 @@ async function getLatestScore(userId: string): Promise<SubscriptionScore | null>
       .where(eq(subscriptionScores.userId, userId))
       .orderBy(desc(subscriptionScores.createdAt))
       .limit(1);
-    return latest ?? null;
+    if (!latest || !isEligibilityInput(latest.inputSnapshot)) return null;
+    return { input: latest.inputSnapshot, savedAt: new Date(latest.createdAt).getTime() };
   } catch {
     return null;
   }
@@ -22,7 +27,7 @@ async function getLatestScore(userId: string): Promise<SubscriptionScore | null>
 
 export default async function HomePage() {
   const session = await getSession();
-  const latestScore = session ? await getLatestScore(session.id) : null;
+  const serverRecord = session ? await getLatestServerRecord(session.id) : null;
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
@@ -165,22 +170,7 @@ export default async function HomePage() {
         </div>
 
         {/* Last Score Card */}
-        {latestScore && (
-          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-4">
-            <p className="text-xs text-blue-500 font-semibold mb-1">내 마지막 청약 가점</p>
-            <div className="flex items-center justify-between">
-              <span className="text-2xl font-bold text-blue-700">{latestScore.totalScore}점</span>
-              <span className="text-xs text-gray-400">{new Date(latestScore.createdAt).toLocaleDateString('ko-KR')}</span>
-            </div>
-            <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-gray-500 mt-1">
-              <span>무주택 {latestScore.housingScore}점</span>
-              <span>·</span>
-              <span>부양가족 {latestScore.dependentScore}점</span>
-              <span>·</span>
-              <span>청약통장 {latestScore.subscriptionScore}점</span>
-            </div>
-          </div>
-        )}
+        <LastScoreCard serverRecord={serverRecord} />
 
         {/* CTA Buttons */}
         <div className="space-y-3">
