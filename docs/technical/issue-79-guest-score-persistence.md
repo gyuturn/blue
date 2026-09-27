@@ -15,11 +15,11 @@
 | 키 | 값 | 쓰는 곳 | 지우는 곳 |
 |---|---|---|---|
 | `blue_last_score_v1` | `{ v: 1, input: EligibilityInput, savedAt: number }` | `/result` 진입 시 | 홈 카드 "지우기" |
-| `blue_calc_draft_v1` | `{ v: 1, input, step, savedAt }` | 계산기 입력/단계 변경 시 | 결과 진입, "처음부터" |
+| `blue_calc_draft_v2` | `{ v: 1, input, step, savedAt }` | 계산기 입력/단계 변경 시 | 결과 진입, "처음부터" |
 
 - **입력값만 저장하고 점수는 읽을 때 다시 계산**한다 (`toStoredScoreData`). 가점 규칙이 바뀌면(#82) 저장된 기록도 자동으로 새 규칙을 따른다. 입력 시점에 계산돼 저장되는 `homelessYears`도 `refreshInput`으로 오늘 기준 재계산한다(통장·혼인 기간과 같은 기준).
 - 파싱 시 `EligibilityInput`의 모든 필드 타입을 검사(`isEligibilityInput`)하고, 하나라도 다르면 "기록 없음"으로 처리한다.
-- 스키마가 바뀌면 키 버전(`_v2`)을 올린다.
+- 스키마나 단계 구성이 바뀌면 키 버전을 올린다. #78에서 계산기가 6단계가 되어 draft 키를 `_v2`로 올렸다(v1 draft는 무시).
 
 ## 3. 구성
 

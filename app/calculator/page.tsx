@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import StepIndicator from '@/components/StepIndicator';
 import Disclaimer from '@/components/Disclaimer';
@@ -82,6 +82,16 @@ export default function CalculatorPage() {
 
   const score = useMemo(() => calculateTotalScore(input), [input]);
 
+  // 단계가 바뀌면 새 질문으로 초점을 옮겨 스크린리더가 질문을 읽게 한다 (첫 진입은 제외)
+  const stepChangedRef = useRef(false);
+  useEffect(() => {
+    if (!stepChangedRef.current) {
+      stepChangedRef.current = true;
+      return;
+    }
+    document.getElementById('question-title')?.focus({ preventScroll: true });
+  }, [step]);
+
   const resumeDraft = () => {
     if (!draft) return;
     setInput(refreshInput(draft.input));
@@ -159,7 +169,7 @@ export default function CalculatorPage() {
           <div className="bg-blue-50 rounded-2xl p-4 mb-6">
             <p className="text-sm font-semibold text-gray-900">지난번에 입력하던 내용이 있어요</p>
             <p className="text-xs text-gray-500 mt-0.5">
-              &lsquo;{STEP_LABELS[clampStep(draft.step) - 1]}&rsquo; 질문까지 답했어요
+              &lsquo;{STEP_LABELS[clampStep(draft.step) - 1]}&rsquo; 질문에서 멈췄어요
             </p>
             <div className="flex gap-2 mt-3">
               <button
@@ -225,7 +235,7 @@ export default function CalculatorPage() {
         </div>
 
         <Disclaimer />
-        <div className="h-32" />
+        <div className="h-44" />
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-gray-100 bg-white pt-3">
@@ -255,7 +265,13 @@ export default function CalculatorPage() {
 function Question({ title, description }: { title: ReactNode; description?: ReactNode }) {
   return (
     <div className="mb-6">
-      <h1 className="text-[26px] leading-snug font-bold text-gray-900 whitespace-pre-line">{title}</h1>
+      <h1
+        id="question-title"
+        tabIndex={-1}
+        className="text-[26px] leading-snug font-bold text-gray-900 whitespace-pre-line focus:outline-none"
+      >
+        {title}
+      </h1>
       {description && <p className="text-[15px] text-gray-500 mt-2 leading-relaxed">{description}</p>}
     </div>
   );
@@ -366,7 +382,7 @@ function HomeStep({
     <div>
       <Question
         title="지금 내 집이 있나요?"
-        description="나와 같은 주민등록등본에 있는 가족 중 한 명이라도 집이 있으면 '있어요'를 골라 주세요."
+        description="나, 배우자, 같은 주민등록등본에 있는 가족 중 한 명이라도 집이 있으면 '있어요'를 골라 주세요."
       />
       <div className="space-y-3">
         <ChoiceCard
@@ -474,7 +490,8 @@ function MarriageStep({
 
       <WhyAsk>
         {isHomeless && <p>만 30세 전에 결혼했다면 무주택 기간을 결혼한 날부터 셀 수 있어요.</p>}
-        <p>결혼한 지 7년이 안 됐다면 신혼부부 특별공급을 받을 수 있는지도 확인해 드려요.</p>
+        {isHomeless && <p>결혼한 지 7년이 안 됐다면 신혼부부 특별공급을 받을 수 있는지도 확인해 드려요.</p>}
+        {!isHomeless && <p>결혼 여부는 특별공급 자격을 확인하는 데 써요.</p>}
       </WhyAsk>
     </div>
   );
@@ -493,7 +510,7 @@ function FamilyStep({
     <div>
       <Question
         title="함께 사는 가족은 몇 명인가요?"
-        description="나는 빼고 세어 주세요. 같은 주민등록등본에 있는 배우자, 부모님·조부모님, 자녀·손주가 해당돼요."
+        description="나는 빼고 세어 주세요. 배우자와, 같은 주민등록등본에 있는 부모님·조부모님, 자녀가 해당돼요."
       />
 
       <div className="flex items-center justify-center gap-8 py-4">
@@ -506,7 +523,7 @@ function FamilyStep({
           −
         </button>
         <p className="text-center">
-          <span className="text-6xl font-bold text-gray-900 tabular-nums">{dependentsCount}</span>
+          <span className="text-6xl font-bold text-gray-900 tabular-nums" aria-live="polite">{dependentsCount}</span>
           <span className="text-xl text-gray-500 ml-1">명{dependentsCount >= 6 ? ' 이상' : ''}</span>
         </p>
         <button
@@ -526,7 +543,10 @@ function FamilyStep({
 
       <WhyAsk>
         <p>함께 사는 가족이 많을수록 점수가 올라가요. 0명이면 5점, 1명마다 5점씩 더해서 6명 이상이면 35점이에요.</p>
-        <p className="text-gray-500">부모님·조부모님은 3년 이상 같은 등본에 있어야 인정돼요.</p>
+        <p className="text-gray-500">
+          배우자는 등본이 달라도 인정돼요. 부모님·조부모님은 3년 이상 같은 등본에 있고 집이 없어야 인정되고, 손주는 그
+          부모가 없을 때만 인정돼요.
+        </p>
       </WhyAsk>
     </div>
   );
@@ -630,7 +650,7 @@ function AccountStep({
           <p className="text-xs text-gray-500 mt-1.5">
             {subscriptionBalance > 0
               ? `${(subscriptionBalance * 10000).toLocaleString('ko-KR')}원`
-              : '민간 아파트는 지역·면적마다 필요한 금액이 달라요 (서울 85㎡ 초과는 1,500만원)'}
+              : '민간 아파트는 지역·면적마다 필요한 금액이 달라요 (서울은 전용 85㎡ 이하 300만원, 모든 면적 1,500만원)'}
           </p>
         </div>
       </div>
@@ -694,7 +714,7 @@ function ChildrenStep({
           −
         </button>
         <p className="text-center">
-          <span className="text-6xl font-bold text-gray-900 tabular-nums">{childrenCount}</span>
+          <span className="text-6xl font-bold text-gray-900 tabular-nums" aria-live="polite">{childrenCount}</span>
           <span className="text-xl text-gray-500 ml-1">명</span>
         </p>
         <button

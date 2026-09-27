@@ -215,7 +215,7 @@ function ResultView({
       key: 'firstHome',
       label: <Tooltip term={TERM_MAP.saengaeCheot.term} definition={TERM_MAP.saengaeCheot.shortDef}>생애최초 특별공급</Tooltip>,
       eligible: specialSupply.firstHome,
-      description: '집이 없고, 청약통장에 12번 이상 냈다면 대상이에요',
+      description: '집을 가져본 적이 없고 청약통장에 12번 이상 냈다면 확인해 볼 수 있어요 (소득 등 다른 조건도 있어요)',
     },
     {
       key: 'multiChild',
@@ -347,7 +347,7 @@ function ResultView({
         </section>
 
         <Disclaimer />
-        <div className="h-32" />
+        <div className="h-44" />
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-gray-100 bg-white pt-3">
