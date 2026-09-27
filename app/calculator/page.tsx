@@ -1,12 +1,15 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import StepIndicator from '@/components/StepIndicator';
 import Disclaimer from '@/components/Disclaimer';
-import { Tooltip } from '@/components/ui/Tooltip';
 import { useLocalStorageItem } from '@/hooks/useLocalStorage';
-import { calcHomelessStartDate, calcHomelessYearsFromPolicy } from '@/lib/calculator';
+import {
+  calcHomelessStartDate,
+  calcHomelessYearsFromPolicy,
+  calculateTotalScore,
+} from '@/lib/calculator';
 import {
   CALC_DRAFT_KEY,
   parseCalcDraft,
@@ -36,9 +39,9 @@ const REGIONS = [
   '제주특별자치도',
 ];
 
-const STEP_LABELS = ['무주택', '부양가족', '청약통장', '거주지역', '혼인/자녀'];
+const STEP_LABELS = ['집', '결혼', '가족', '청약통장', '사는 곳', '자녀'];
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = STEP_LABELS.length;
 
 const defaultInput: EligibilityInput = {
   isHomeless: true,
@@ -54,6 +57,12 @@ const defaultInput: EligibilityInput = {
   childrenCount: 0,
   hasRecentChild: false,
 };
+
+type OnChange = <K extends keyof EligibilityInput>(key: K, value: EligibilityInput[K]) => void;
+
+function clampStep(step: number) {
+  return Math.min(Math.max(step, 1), TOTAL_STEPS);
+}
 
 export default function CalculatorPage() {
   const router = useRouter();
@@ -71,10 +80,12 @@ export default function CalculatorPage() {
     if (!pristine) setDraftRaw(serializeCalcDraft(input, step));
   }, [input, step, resumeDecided, setDraftRaw]);
 
+  const score = useMemo(() => calculateTotalScore(input), [input]);
+
   const resumeDraft = () => {
     if (!draft) return;
     setInput(refreshInput(draft.input));
-    setStep(Math.min(Math.max(draft.step, 1), TOTAL_STEPS));
+    setStep(clampStep(draft.step));
     setResumeDecided(true);
   };
 
@@ -83,14 +94,10 @@ export default function CalculatorPage() {
     setResumeDecided(true);
   };
 
-  const updateInput = <K extends keyof EligibilityInput>(
-    key: K,
-    value: EligibilityInput[K],
-  ) => {
+  const updateInput: OnChange = (key, value) => {
     setResumeDecided(true);
     setInput((prev) => {
       const next = { ...prev, [key]: value };
-      // birthDate, isMarried, marriageDate 변경 시 homelessYears 자동 재계산
       if (key === 'birthDate' || key === 'isMarried' || key === 'marriageDate') {
         next.homelessYears = calcHomelessYearsFromPolicy(
           next.birthDate,
@@ -106,6 +113,7 @@ export default function CalculatorPage() {
     setResumeDecided(true);
     if (step < TOTAL_STEPS) {
       setStep((s) => s + 1);
+      window.scrollTo({ top: 0 });
     } else {
       router.push(resultUrl(input));
     }
@@ -113,44 +121,45 @@ export default function CalculatorPage() {
 
   const handleBack = () => {
     setResumeDecided(true);
-    if (step > 1) setStep((s) => s - 1);
+    if (step > 1) {
+      setStep((s) => s - 1);
+      window.scrollTo({ top: 0 });
+    } else {
+      router.push('/');
+    }
   };
 
+  // 점수에 들어가는 항목만 단계별로 더해 "지금까지"를 보여준다
+  const scoreSoFar =
+    step <= 2
+      ? score.homelessScore
+      : step === 3
+        ? score.homelessScore + score.dependentsScore
+        : score.totalScore;
+
   return (
-    <main className="min-h-screen bg-gray-50">
-      <div className="max-w-md mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-6">
-          <button
-            onClick={() => router.push('/')}
-            className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm mb-4"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+    <main className="min-h-screen bg-white">
+      <div className="max-w-md mx-auto px-5">
+        <div className="sticky top-14 z-10 bg-white pt-3 pb-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleBack}
+              aria-label={step > 1 ? '이전 질문' : '홈으로'}
+              className="-ml-2 p-2 rounded-full text-gray-600 hover:bg-gray-100 transition-colors"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
-            홈으로
-          </button>
-          <h1 className="text-2xl font-bold text-gray-900">청약 가점 계산</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            정확한 정보를 입력하면 더 정밀한 결과를 제공합니다.
-          </p>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <StepIndicator currentStep={step} totalSteps={TOTAL_STEPS} />
+          </div>
         </div>
 
         {showResumeBanner && draft && (
-          <div className="bg-white border border-blue-100 rounded-2xl p-4 mb-4 shadow-sm">
+          <div className="bg-blue-50 rounded-2xl p-4 mb-6">
             <p className="text-sm font-semibold text-gray-900">지난번에 입력하던 내용이 있어요</p>
             <p className="text-xs text-gray-500 mt-0.5">
-              {STEP_LABELS[Math.min(Math.max(draft.step, 1), TOTAL_STEPS) - 1]} 단계까지 입력했어요
+              &lsquo;{STEP_LABELS[clampStep(draft.step) - 1]}&rsquo; 질문까지 답했어요
             </p>
             <div className="flex gap-2 mt-3">
               <button
@@ -161,7 +170,7 @@ export default function CalculatorPage() {
               </button>
               <button
                 onClick={startOver}
-                className="flex-1 py-2.5 rounded-xl bg-gray-100 text-gray-700 text-sm font-semibold hover:bg-gray-200 transition-colors"
+                className="flex-1 py-2.5 rounded-xl bg-white text-gray-700 text-sm font-semibold hover:bg-gray-100 transition-colors"
               >
                 처음부터
               </button>
@@ -169,45 +178,45 @@ export default function CalculatorPage() {
           </div>
         )}
 
-        <StepIndicator
-          currentStep={step}
-          totalSteps={TOTAL_STEPS}
-          stepLabels={STEP_LABELS}
-        />
-
-        {/* Step Content */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-4">
+        <div key={step} className="animate-fade-slide-in pb-6">
           {step === 1 && (
-            <Step1
+            <HomeStep
               isHomeless={input.isHomeless}
               birthDate={input.birthDate}
               isMarried={input.isMarried}
               marriageDate={input.marriageDate}
               homelessYears={input.homelessYears}
+              homelessScore={score.homelessScore}
               onChange={updateInput}
             />
           )}
           {step === 2 && (
-            <Step2
-              dependentsCount={input.dependentsCount}
+            <MarriageStep
+              isHomeless={input.isHomeless}
+              isMarried={input.isMarried}
+              marriageDate={input.marriageDate}
               onChange={updateInput}
             />
           )}
           {step === 3 && (
-            <Step3
-              subscriptionStartDate={input.subscriptionStartDate}
-              subscriptionPaymentCount={input.subscriptionPaymentCount}
-              subscriptionBalance={input.subscriptionBalance}
+            <FamilyStep
+              dependentsCount={input.dependentsCount}
+              dependentsScore={score.dependentsScore}
               onChange={updateInput}
             />
           )}
           {step === 4 && (
-            <Step4 region={input.region} onChange={updateInput} />
+            <AccountStep
+              subscriptionStartDate={input.subscriptionStartDate}
+              subscriptionPaymentCount={input.subscriptionPaymentCount}
+              subscriptionBalance={input.subscriptionBalance}
+              subscriptionScore={score.subscriptionScore}
+              onChange={updateInput}
+            />
           )}
-          {step === 5 && (
-            <Step5
-              isMarried={input.isMarried}
-              marriageDate={input.marriageDate}
+          {step === 5 && <RegionStep region={input.region} onChange={updateInput} />}
+          {step === 6 && (
+            <ChildrenStep
               childrenCount={input.childrenCount}
               hasRecentChild={input.hasRecentChild}
               onChange={updateInput}
@@ -215,37 +224,131 @@ export default function CalculatorPage() {
           )}
         </div>
 
-        {/* Navigation */}
-        <div className="flex gap-3">
-          {step > 1 && (
-            <button
-              onClick={handleBack}
-              className="flex-1 py-3.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold rounded-xl transition-colors"
-            >
-              이전
-            </button>
-          )}
+        <Disclaimer />
+        <div className="h-32" />
+      </div>
+
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-gray-100 bg-white pt-3">
+        <div className="max-w-md mx-auto px-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <p className="text-center text-sm text-gray-500 mb-2" aria-live="polite">
+            {step <= 4 ? (
+              <>
+                지금까지 예상 <span className="font-bold text-blue-600 tabular-nums">{scoreSoFar}점</span>
+                <span className="text-gray-400"> / 84점</span>
+              </>
+            ) : (
+              '이 질문은 점수와 상관없어요 · 특별공급 확인용'
+            )}
+          </p>
           <button
             onClick={handleNext}
-            className="flex-1 py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors shadow-md"
+            className="w-full py-4 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white text-base font-semibold transition-all"
           >
-            {step === TOTAL_STEPS ? '결과 보기' : '다음'}
+            {step === TOTAL_STEPS ? '내 점수 보기' : '다음'}
           </button>
         </div>
-
-        <Disclaimer />
       </div>
     </main>
   );
 }
 
-// Step 1: 무주택 여부 및 기간
-function Step1({
+function Question({ title, description }: { title: ReactNode; description?: ReactNode }) {
+  return (
+    <div className="mb-6">
+      <h1 className="text-[26px] leading-snug font-bold text-gray-900 whitespace-pre-line">{title}</h1>
+      {description && <p className="text-[15px] text-gray-500 mt-2 leading-relaxed">{description}</p>}
+    </div>
+  );
+}
+
+function WhyAsk({ children }: { children: ReactNode }) {
+  return (
+    <details className="group mt-6 rounded-2xl bg-gray-50 px-4 py-3 text-sm text-gray-600">
+      <summary className="flex cursor-pointer list-none items-center justify-between font-medium text-gray-700 [&::-webkit-details-marker]:hidden">
+        왜 물어보나요?
+        <svg
+          className="w-4 h-4 text-gray-400 transition-transform group-open:rotate-180"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </summary>
+      <div className="mt-2 space-y-1.5 leading-relaxed">{children}</div>
+    </details>
+  );
+}
+
+function ChoiceCard({
+  selected,
+  onClick,
+  title,
+  description,
+}: {
+  selected: boolean;
+  onClick: () => void;
+  title: string;
+  description?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className={`w-full flex items-center justify-between gap-3 rounded-2xl px-5 py-4 text-left transition-colors ${
+        selected ? 'bg-blue-50 ring-2 ring-blue-600' : 'bg-gray-50 hover:bg-gray-100'
+      }`}
+    >
+      <span>
+        <span className={`block text-base font-semibold ${selected ? 'text-blue-700' : 'text-gray-900'}`}>
+          {title}
+        </span>
+        {description && <span className="block text-sm text-gray-500 mt-0.5">{description}</span>}
+      </span>
+      <span
+        className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full ${
+          selected ? 'bg-blue-600' : 'bg-gray-200'
+        }`}
+      >
+        <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+        </svg>
+      </span>
+    </button>
+  );
+}
+
+function FieldLabel({ children, htmlFor }: { children: ReactNode; htmlFor: string }) {
+  return (
+    <label htmlFor={htmlFor} className="block text-sm font-semibold text-gray-700 mb-2">
+      {children}
+    </label>
+  );
+}
+
+const inputClass =
+  'w-full rounded-2xl bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-600';
+
+function Note({ tone = 'info', children }: { tone?: 'info' | 'warn'; children: ReactNode }) {
+  return (
+    <div
+      className={`mt-3 rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+        tone === 'warn' ? 'bg-amber-50 text-amber-800' : 'bg-blue-50 text-blue-800'
+      }`}
+    >
+      {children}
+    </div>
+  );
+}
+
+function HomeStep({
   isHomeless,
   birthDate,
   isMarried,
   marriageDate,
   homelessYears,
+  homelessScore,
   onChange,
 }: {
   isHomeless: boolean;
@@ -253,211 +356,178 @@ function Step1({
   isMarried: boolean;
   marriageDate: string;
   homelessYears: number;
-  onChange: <K extends keyof EligibilityInput>(
-    key: K,
-    value: EligibilityInput[K],
-  ) => void;
+  homelessScore: number;
+  onChange: OnChange;
 }) {
   const startDate = calcHomelessStartDate(birthDate, isMarried, marriageDate);
-  const isUnder30Single = isHomeless && birthDate && !isMarried && startDate === null;
-
-  const startDateLabel = (() => {
-    if (!startDate) return null;
-    return `${startDate.getFullYear()}년 ${startDate.getMonth() + 1}월`;
-  })();
-
-  const homelessYearsFloor = Math.floor(homelessYears);
+  const notCountedYet = isHomeless && birthDate && startDate === null;
 
   return (
     <div>
-      <h2 className="text-lg font-bold text-gray-900 mb-1">
-        <Tooltip content="세대원 전원이 현재 주택을 소유하지 않은 상태를 말합니다. 세대원 중 한 명이라도 주택을 소유하면 무주택자로 인정되지 않습니다.">
-          <span>무주택 여부 <span className="text-blue-400 text-base" aria-label="도움말">ⓘ</span></span>
-        </Tooltip>
-      </h2>
-      <p className="text-gray-500 text-sm mb-5">
-        현재 주택을 소유하고 있지 않으신가요?
-      </p>
-
-      <div className="space-y-3 mb-6">
-        <button
+      <Question
+        title="지금 내 집이 있나요?"
+        description="나와 같은 주민등록등본에 있는 가족 중 한 명이라도 집이 있으면 '있어요'를 골라 주세요."
+      />
+      <div className="space-y-3">
+        <ChoiceCard
+          selected={isHomeless}
           onClick={() => onChange('isHomeless', true)}
-          className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
-            isHomeless
-              ? 'border-blue-600 bg-blue-50'
-              : 'border-gray-200 bg-white'
-          }`}
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                isHomeless ? 'border-blue-600' : 'border-gray-300'
-              }`}
-            >
-              {isHomeless && (
-                <div className="w-2.5 h-2.5 rounded-full bg-blue-600" />
-              )}
-            </div>
-            <div>
-              <p className="font-semibold text-gray-800">무주택자입니다</p>
-              <p className="text-gray-500 text-xs">
-                현재 소유한 주택이 없습니다
-              </p>
-            </div>
-          </div>
-        </button>
-
-        <button
+          title="없어요"
+          description="나도, 함께 사는 가족도 집이 없어요"
+        />
+        <ChoiceCard
+          selected={!isHomeless}
           onClick={() => onChange('isHomeless', false)}
-          className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
-            !isHomeless
-              ? 'border-blue-600 bg-blue-50'
-              : 'border-gray-200 bg-white'
-          }`}
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                !isHomeless ? 'border-blue-600' : 'border-gray-300'
-              }`}
-            >
-              {!isHomeless && (
-                <div className="w-2.5 h-2.5 rounded-full bg-blue-600" />
-              )}
-            </div>
-            <div>
-              <p className="font-semibold text-gray-800">주택 소유자입니다</p>
-              <p className="text-gray-500 text-xs">현재 주택을 보유하고 있습니다</p>
-            </div>
-          </div>
-        </button>
+          title="있어요"
+          description="나나 가족 중 누군가 집이 있어요"
+        />
       </div>
 
       {isHomeless && (
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            <Tooltip content="무주택기간 산정 시작일은 만 30세 생일 또는 혼인신고일 중 빠른 날입니다. 만 30세 미만 미혼인 경우 산정되지 않습니다.">
-              <span>생년월일 <span className="text-blue-400" aria-label="도움말">ⓘ</span></span>
-            </Tooltip>
-          </label>
+        <div className="mt-8">
+          <FieldLabel htmlFor="birthDate">태어난 해와 달을 알려주세요</FieldLabel>
           <input
+            id="birthDate"
             type="month"
             value={birthDate}
             onChange={(e) => onChange('birthDate', e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="YYYY-MM"
+            className={inputClass}
           />
-
-          {isUnder30Single && (
-            <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <p className="text-xs text-yellow-700 font-medium">
-                만 30세 미만 미혼인 경우 무주택기간이 산정되지 않습니다.
-              </p>
-              <p className="text-xs text-yellow-600 mt-0.5">
-                만 30세가 되는 날부터 무주택기간이 시작됩니다.
-              </p>
-            </div>
+          {notCountedYet && (
+            <Note tone="warn">
+              만 30세 전이고 결혼하지 않았다면 아직 기간이 쌓이지 않아요. 만 30세 생일부터 세기 시작해요.
+              <br />
+              결혼했다면 다음 질문에서 알려주세요. 결혼한 날부터 셀 수 있어요.
+            </Note>
           )}
-
-          {startDate && birthDate && (
-            <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-xs text-blue-600 font-medium mb-1">무주택기간 자동 계산 결과</p>
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-gray-600">산정 시작일</span>
-                <span className="text-xs font-semibold text-gray-800">{startDateLabel}</span>
-              </div>
-              <div className="flex justify-between items-center mt-1">
-                <span className="text-xs text-gray-600">무주택기간</span>
-                <span className="text-xs font-semibold text-blue-700">{homelessYearsFloor}년</span>
-              </div>
-              <div className="flex justify-between items-center mt-1">
-                <span className="text-xs text-gray-600">예상 점수</span>
-                <span className="text-xs font-semibold text-blue-700">
-                  {homelessYearsFloor <= 0 ? 2 : Math.min(homelessYearsFloor * 2, 32)}점 / 32점
-                </span>
-              </div>
-            </div>
+          {startDate && (
+            <Note>
+              {startDate.getFullYear()}년 {startDate.getMonth() + 1}월부터 약{' '}
+              <strong>{Math.floor(homelessYears)}년</strong> 동안 집 없이 지냈어요 →{' '}
+              <strong>{homelessScore}점</strong>
+              <span className="text-blue-600"> / 32점</span>
+            </Note>
           )}
         </div>
       )}
+
+      {!isHomeless && (
+        <Note tone="warn">
+          집이 있으면 무주택 점수는 0점이에요. 나머지 항목은 계속 계산해 드릴게요.
+        </Note>
+      )}
+
+      <WhyAsk>
+        <p>집이 없는 기간이 길수록 청약 점수가 올라가요. 최대 32점이에요.</p>
+        <p className="text-gray-500">
+          기간은 만 30세 생일부터 세요. 그전에 결혼했다면 결혼한 날부터 세요.
+        </p>
+      </WhyAsk>
     </div>
   );
 }
 
-// Step 2: 부양가족 수
-function Step2({
-  dependentsCount,
+function MarriageStep({
+  isHomeless,
+  isMarried,
+  marriageDate,
   onChange,
 }: {
-  dependentsCount: number;
-  onChange: <K extends keyof EligibilityInput>(
-    key: K,
-    value: EligibilityInput[K],
-  ) => void;
+  isHomeless: boolean;
+  isMarried: boolean;
+  marriageDate: string;
+  onChange: OnChange;
 }) {
-  const scoreMap = [5, 10, 15, 20, 25, 30, 35];
-  const score = scoreMap[Math.min(dependentsCount, 6)];
+  const today = new Date().toISOString().slice(0, 7);
 
   return (
     <div>
-      <h2 className="text-lg font-bold text-gray-900 mb-1">
-        <Tooltip content="주민등록상 같은 세대에 등록된 배우자, 직계존속(부모·조부모), 직계비속(자녀·손자녀)을 포함합니다. 최대 35점이며 6명 이상이면 만점입니다.">
-          <span>부양가족 수 <span className="text-blue-400 text-base" aria-label="도움말">ⓘ</span></span>
-        </Tooltip>
-      </h2>
-      <p className="text-gray-500 text-sm mb-5">
-        배우자, 자녀, 직계존속(부모님 등) 모두 포함하여 입력하세요.
-      </p>
+      <Question
+        title="결혼했나요?"
+        description="혼인신고를 했는지 기준으로 골라 주세요."
+      />
+      <div className="space-y-3">
+        <ChoiceCard selected={isMarried} onClick={() => onChange('isMarried', true)} title="네, 했어요" />
+        <ChoiceCard
+          selected={!isMarried}
+          onClick={() => {
+            onChange('isMarried', false);
+            onChange('marriageDate', '');
+          }}
+          title="아니요"
+        />
+      </div>
 
-      <div className="flex items-center justify-center gap-6 mb-4">
-        <button
-          onClick={() =>
-            onChange('dependentsCount', Math.max(0, dependentsCount - 1))
-          }
-          className="w-12 h-12 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-2xl font-bold text-gray-700 transition-colors"
-        >
-          -
-        </button>
-        <div className="text-center">
-          <span className="text-5xl font-bold text-blue-600">
-            {dependentsCount}
-          </span>
-          <p className="text-gray-500 text-sm mt-1">명</p>
+      {isMarried && (
+        <div className="mt-8">
+          <FieldLabel htmlFor="marriageDate">혼인신고한 해와 달</FieldLabel>
+          <input
+            id="marriageDate"
+            type="month"
+            max={today}
+            value={marriageDate}
+            onChange={(e) => onChange('marriageDate', e.target.value)}
+            className={inputClass}
+          />
         </div>
+      )}
+
+      <WhyAsk>
+        {isHomeless && <p>만 30세 전에 결혼했다면 무주택 기간을 결혼한 날부터 셀 수 있어요.</p>}
+        <p>결혼한 지 7년이 안 됐다면 신혼부부 특별공급을 받을 수 있는지도 확인해 드려요.</p>
+      </WhyAsk>
+    </div>
+  );
+}
+
+function FamilyStep({
+  dependentsCount,
+  dependentsScore,
+  onChange,
+}: {
+  dependentsCount: number;
+  dependentsScore: number;
+  onChange: OnChange;
+}) {
+  return (
+    <div>
+      <Question
+        title="함께 사는 가족은 몇 명인가요?"
+        description="나는 빼고 세어 주세요. 같은 주민등록등본에 있는 배우자, 부모님·조부모님, 자녀·손주가 해당돼요."
+      />
+
+      <div className="flex items-center justify-center gap-8 py-4">
         <button
+          type="button"
+          aria-label="한 명 줄이기"
+          onClick={() => onChange('dependentsCount', Math.max(0, dependentsCount - 1))}
+          className="h-14 w-14 rounded-full bg-gray-100 text-2xl font-bold text-gray-700 hover:bg-gray-200 transition-colors"
+        >
+          −
+        </button>
+        <p className="text-center">
+          <span className="text-6xl font-bold text-gray-900 tabular-nums">{dependentsCount}</span>
+          <span className="text-xl text-gray-500 ml-1">명{dependentsCount >= 6 ? ' 이상' : ''}</span>
+        </p>
+        <button
+          type="button"
+          aria-label="한 명 늘리기"
           onClick={() => onChange('dependentsCount', Math.min(6, dependentsCount + 1))}
-          className="w-12 h-12 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-2xl font-bold text-gray-700 transition-colors"
+          className="h-14 w-14 rounded-full bg-gray-100 text-2xl font-bold text-gray-700 hover:bg-gray-200 transition-colors"
         >
           +
         </button>
       </div>
 
-      <div className="bg-blue-50 rounded-xl p-3 text-center">
-        <p className="text-sm text-gray-600">
-          부양가족 점수:{' '}
-          <span className="font-bold text-blue-600 text-lg">{score}점</span>{' '}
-          / 35점
-        </p>
-      </div>
+      <Note>
+        가족 {dependentsCount}명{dependentsCount >= 6 ? ' 이상' : ''} → <strong>{dependentsScore}점</strong>
+        <span className="text-blue-600"> / 35점</span>
+      </Note>
 
-      <div className="mt-4 grid grid-cols-7 gap-1">
-        {[0, 1, 2, 3, 4, 5, 6].map((n) => (
-          <button
-            key={n}
-            onClick={() => onChange('dependentsCount', n)}
-            className={`py-2 rounded-lg text-sm font-semibold transition-colors ${
-              dependentsCount === n
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            {n === 6 ? '6+' : n}
-          </button>
-        ))}
-      </div>
-      <p className="text-xs text-gray-400 mt-2 text-center">
-        빠른 선택: 인원 수를 클릭하세요
-      </p>
+      <WhyAsk>
+        <p>함께 사는 가족이 많을수록 점수가 올라가요. 0명이면 5점, 1명마다 5점씩 더해서 6명 이상이면 35점이에요.</p>
+        <p className="text-gray-500">부모님·조부모님은 3년 이상 같은 등본에 있어야 인정돼요.</p>
+      </WhyAsk>
     </div>
   );
 }
@@ -466,9 +536,9 @@ function formatMonthsToYears(months: number): string {
   if (months <= 0) return '';
   const years = Math.floor(months / 12);
   const remaining = months % 12;
-  if (years === 0) return `${months}회 = ${months}개월`;
-  if (remaining === 0) return `${months}회 = 약 ${years}년`;
-  return `${months}회 = 약 ${years}년 ${remaining}개월`;
+  if (years === 0) return `${months}개월 동안 냈어요`;
+  if (remaining === 0) return `약 ${years}년 동안 냈어요`;
+  return `약 ${years}년 ${remaining}개월 동안 냈어요`;
 }
 
 function formatWithComma(value: number): string {
@@ -476,93 +546,73 @@ function formatWithComma(value: number): string {
   return value.toLocaleString('ko-KR');
 }
 
-
-// Step 3: 청약통장 정보
-function Step3({
+function AccountStep({
   subscriptionStartDate,
   subscriptionPaymentCount,
   subscriptionBalance,
+  subscriptionScore,
   onChange,
 }: {
   subscriptionStartDate: string;
   subscriptionPaymentCount: number;
   subscriptionBalance: number;
-  onChange: <K extends keyof EligibilityInput>(
-    key: K,
-    value: EligibilityInput[K],
-  ) => void;
+  subscriptionScore: number;
+  onChange: OnChange;
 }) {
   const [displayBalance, setDisplayBalance] = useState(formatWithComma(subscriptionBalance));
-
   const paymentHint = formatMonthsToYears(subscriptionPaymentCount);
-  const wonDisplay = subscriptionBalance > 0
-    ? `= ${(subscriptionBalance * 10000).toLocaleString('ko-KR')}원`
-    : null;
 
   return (
     <div>
-      <h2 className="text-lg font-bold text-gray-900 mb-1">
-        <Tooltip content="주택청약종합저축 등 청약 신청을 위한 전용 통장입니다. 가입 기간과 납입 횟수가 가점에 반영됩니다.">
-          <span>청약통장 정보 <span className="text-blue-400 text-base" aria-label="도움말">ⓘ</span></span>
-        </Tooltip>
-      </h2>
-      <p className="text-gray-500 text-sm mb-5">
-        청약통장(주택청약종합저축) 가입 정보를 입력하세요.
-      </p>
+      <Question
+        title="청약통장은 언제 만들었나요?"
+        description="은행 앱에서 '주택청약종합저축' 가입일을 확인할 수 있어요. 잘 모르겠다면 비워 두고 넘어가도 돼요."
+      />
 
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-            가입 시작월
-          </label>
-          <input
-            type="month"
-            value={subscriptionStartDate}
-            onChange={(e) => onChange('subscriptionStartDate', e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800"
-          />
-        </div>
+      <FieldLabel htmlFor="subscriptionStartDate">가입한 해와 달</FieldLabel>
+      <input
+        id="subscriptionStartDate"
+        type="month"
+        value={subscriptionStartDate}
+        onChange={(e) => onChange('subscriptionStartDate', e.target.value)}
+        className={inputClass}
+      />
+      <Note>
+        {subscriptionStartDate ? '가입 기간' : '가입일을 비워 두면 가장 낮은 점수로 계산해요'} →{' '}
+        <strong>{subscriptionScore}점</strong>
+        <span className="text-blue-600"> / 17점</span>
+      </Note>
 
+      <div className="mt-8 space-y-6">
+        <p className="text-sm text-gray-500">
+          아래 두 가지는 점수에 들어가지 않아요. 특별공급과 지역별 기준을 확인하는 데 써요.
+        </p>
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-            <Tooltip content="청약통장에 납입한 총 횟수입니다. 생애최초 특별공급은 12회 이상, 가점 만점(17점)은 24회 이상이 필요합니다.">
-              <span>납입 횟수 <span className="text-blue-400" aria-label="도움말">ⓘ</span></span>
-            </Tooltip>
-          </label>
+          <FieldLabel htmlFor="subscriptionPaymentCount">지금까지 몇 번 냈나요?</FieldLabel>
           <div className="relative">
             <input
+              id="subscriptionPaymentCount"
               type="number"
               inputMode="numeric"
               min={0}
               max={600}
               value={subscriptionPaymentCount === 0 ? '' : subscriptionPaymentCount}
-              onChange={(e) =>
-                onChange('subscriptionPaymentCount', Number(e.target.value) || 0)
-              }
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800"
+              onChange={(e) => onChange('subscriptionPaymentCount', Number(e.target.value) || 0)}
+              className={`${inputClass} pr-12`}
               placeholder="예: 60"
             />
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
-              회
-            </span>
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">회</span>
           </div>
-          {paymentHint ? (
-            <p className="text-xs text-blue-500 mt-1">💡 {paymentHint}</p>
-          ) : (
-            <p className="text-xs text-gray-400 mt-1">
-              생애최초 특별공급은 12회 이상 납입 필요
-            </p>
-          )}
+          <p className="text-xs text-gray-500 mt-1.5">
+            {paymentHint || '생애최초 특별공급은 12번 이상 내야 해요'}
+          </p>
         </div>
 
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-            <Tooltip content="민영주택 청약 시 필요한 지역별 최소 예치 금액입니다. 서울 85㎡ 초과는 1,500만원 이상이 필요합니다.">
-              <span>예치 금액 <span className="text-blue-400" aria-label="도움말">ⓘ</span></span>
-            </Tooltip>
-          </label>
+          <FieldLabel htmlFor="subscriptionBalance">통장에 모인 돈은 얼마인가요?</FieldLabel>
           <div className="relative">
             <input
+              id="subscriptionBalance"
               type="text"
               inputMode="numeric"
               value={displayBalance}
@@ -572,232 +622,112 @@ function Step3({
                 setDisplayBalance(raw === '' ? '' : num.toLocaleString('ko-KR'));
                 onChange('subscriptionBalance', num);
               }}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800"
+              className={`${inputClass} pr-14`}
               placeholder="예: 1,500"
             />
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
-              만원
-            </span>
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">만원</span>
           </div>
-          {wonDisplay ? (
-            <p className="text-xs text-blue-500 mt-1">💡 {wonDisplay}</p>
-          ) : (
-            <p className="text-xs text-gray-400 mt-1">
-              서울 85m² 초과: 1,500만원 이상 필요
-            </p>
-          )}
+          <p className="text-xs text-gray-500 mt-1.5">
+            {subscriptionBalance > 0
+              ? `${(subscriptionBalance * 10000).toLocaleString('ko-KR')}원`
+              : '민간 아파트는 지역·면적마다 필요한 금액이 달라요 (서울 85㎡ 초과는 1,500만원)'}
+          </p>
         </div>
       </div>
+
+      <WhyAsk>
+        <p>청약통장을 오래 가지고 있을수록 점수가 올라가요. 최대 17점이에요.</p>
+      </WhyAsk>
     </div>
   );
 }
 
-// Step 4: 거주 지역 선택
-function Step4({
-  region,
-  onChange,
-}: {
-  region: string;
-  onChange: <K extends keyof EligibilityInput>(
-    key: K,
-    value: EligibilityInput[K],
-  ) => void;
-}) {
+function RegionStep({ region, onChange }: { region: string; onChange: OnChange }) {
   return (
     <div>
-      <h2 className="text-lg font-bold text-gray-900 mb-1">거주 지역</h2>
-      <p className="text-gray-500 text-sm mb-5">
-        현재 거주하시는 지역을 선택하세요.
-      </p>
-
-      <div className="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
+      <Question
+        title="지금 어디에 살고 있나요?"
+        description="지역마다 청약할 수 있는 곳과 필요한 예치금이 달라요."
+      />
+      <div className="grid grid-cols-2 gap-2">
         {REGIONS.map((r) => (
           <button
             key={r}
+            type="button"
             onClick={() => onChange('region', r)}
-            className={`py-3 px-3 rounded-xl text-sm font-medium text-left transition-all ${
-              region === r
-                ? 'bg-blue-600 text-white shadow-md'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            aria-pressed={region === r}
+            className={`rounded-2xl px-4 py-3.5 text-left text-[15px] font-medium transition-colors ${
+              region === r ? 'bg-blue-50 text-blue-700 ring-2 ring-blue-600' : 'bg-gray-50 text-gray-800 hover:bg-gray-100'
             }`}
           >
             {r}
           </button>
         ))}
       </div>
-
-      {region && (
-        <div className="mt-3 p-3 bg-blue-50 rounded-xl">
-          <p className="text-sm text-blue-700">
-            선택됨:{' '}
-            <span className="font-semibold">{region}</span>
-          </p>
-        </div>
-      )}
     </div>
   );
 }
 
-// Step 5: 혼인 및 자녀 정보
-function Step5({
-  isMarried,
-  marriageDate,
+function ChildrenStep({
   childrenCount,
   hasRecentChild,
   onChange,
 }: {
-  isMarried: boolean;
-  marriageDate: string;
   childrenCount: number;
   hasRecentChild: boolean;
-  onChange: <K extends keyof EligibilityInput>(
-    key: K,
-    value: EligibilityInput[K],
-  ) => void;
+  onChange: OnChange;
 }) {
-  const today = new Date().toISOString().slice(0, 7);
-
-  const marriageYearsHint = (() => {
-    if (!marriageDate) return null;
-    const [y, m] = marriageDate.split('-').map(Number);
-    if (!y || !m) return null;
-    const diffMs = new Date().getTime() - new Date(y, m - 1, 1).getTime();
-    const totalMonths = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 30.44));
-    const years = Math.floor(totalMonths / 12);
-    const months = totalMonths % 12;
-    const label = years > 0 ? `${years}년 ${months > 0 ? `${months}개월` : ''}`.trim() : `${months}개월`;
-    const eligible = diffMs / (1000 * 60 * 60 * 24 * 365.25) <= 7;
-    return eligible ? `혼인 ${label} → 신혼부부 특공 자격 있음` : `혼인 ${label} → 7년 초과로 자격 없음`;
-  })();
-
-  const childrenHint = childrenCount >= 3
-    ? '다자녀 특공 자격 있음'
-    : `${3 - childrenCount}명 더 있으면 다자녀 특공 가능`;
-
   return (
     <div>
-      <h2 className="text-lg font-bold text-gray-900 mb-1">
-        <Tooltip content="특별공급 자격 판정에 사용됩니다. 신혼부부·생애최초·다자녀 등 정책적 배려 계층에게 별도 물량을 공급하는 제도입니다.">
-          <span>혼인 및 자녀 <span className="text-blue-400 text-base" aria-label="도움말">ⓘ</span></span>
-        </Tooltip>
-      </h2>
-      <p className="text-gray-500 text-sm mb-5">
-        <Tooltip content="신혼부부·다자녀 등 정책 대상에게 별도 물량을 우선 공급"><span className="underline decoration-dotted decoration-blue-400 cursor-help text-blue-700">특별공급</span></Tooltip> 자격 판정에 사용됩니다.
-      </p>
+      <Question
+        title="자녀가 있나요?"
+        description="만 19세가 안 된 자녀 수를 알려주세요. 없으면 0명 그대로 두면 돼요."
+      />
 
-      <div className="space-y-4">
-        {/* 혼인 여부 */}
-        <div>
-          <p className="text-sm font-semibold text-gray-700 mb-2">
-            <Tooltip content="혼인 후 7년 이내이면 신혼부부 특별공급 자격이 생깁니다.">
-              <span>혼인 여부 <span className="text-blue-400" aria-label="도움말">ⓘ</span></span>
-            </Tooltip>
-          </p>
-          <div className="flex gap-3">
-            <button
-              onClick={() => onChange('isMarried', true)}
-              className={`flex-1 py-3 rounded-xl border-2 font-semibold text-sm transition-all ${
-                isMarried ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600'
-              }`}
-            >
-              기혼
-            </button>
-            <button
-              onClick={() => {
-                onChange('isMarried', false);
-                onChange('marriageDate', '');
-              }}
-              className={`flex-1 py-3 rounded-xl border-2 font-semibold text-sm transition-all ${
-                !isMarried ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600'
-              }`}
-            >
-              미혼
-            </button>
-          </div>
-        </div>
+      <div className="flex items-center justify-center gap-8 py-4">
+        <button
+          type="button"
+          aria-label="한 명 줄이기"
+          onClick={() => onChange('childrenCount', Math.max(0, childrenCount - 1))}
+          className="h-14 w-14 rounded-full bg-gray-100 text-2xl font-bold text-gray-700 hover:bg-gray-200 transition-colors"
+        >
+          −
+        </button>
+        <p className="text-center">
+          <span className="text-6xl font-bold text-gray-900 tabular-nums">{childrenCount}</span>
+          <span className="text-xl text-gray-500 ml-1">명</span>
+        </p>
+        <button
+          type="button"
+          aria-label="한 명 늘리기"
+          onClick={() => onChange('childrenCount', childrenCount + 1)}
+          className="h-14 w-14 rounded-full bg-gray-100 text-2xl font-bold text-gray-700 hover:bg-gray-200 transition-colors"
+        >
+          +
+        </button>
+      </div>
+      {childrenCount >= 3 ? (
+        <Note>자녀가 3명 이상이라 다자녀 특별공급을 확인해 볼 수 있어요.</Note>
+      ) : (
+        <p className="text-center text-sm text-gray-500">
+          자녀가 3명 이상이면 다자녀 특별공급을 확인해 볼 수 있어요
+        </p>
+      )}
 
-        {/* 혼인 날짜 — 기혼일 때만 표시 */}
-        {isMarried && (
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-              혼인 날짜
-            </label>
-            <input
-              type="month"
-              max={today}
-              value={marriageDate}
-              onChange={(e) => onChange('marriageDate', e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-800"
-            />
-            {marriageYearsHint && (
-              <p className={`text-xs mt-1 ${marriageYearsHint.includes('없음') ? 'text-red-500' : 'text-blue-500'}`}>
-                💡 {marriageYearsHint}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* 미성년 자녀 수 */}
-        <div>
-          <p className="text-sm font-semibold text-gray-700 mb-2">
-            <Tooltip content="만 19세 미만 자녀 수입니다. 3명 이상이면 다자녀 특별공급 자격이 생깁니다.">
-              <span>미성년 자녀 수 <span className="font-normal text-gray-400">(만 19세 미만)</span> <span className="text-blue-400" aria-label="도움말">ⓘ</span></span>
-            </Tooltip>
-          </p>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => onChange('childrenCount', Math.max(0, childrenCount - 1))}
-              className="w-12 h-12 rounded-xl border-2 border-gray-200 text-xl font-bold text-gray-600 hover:border-blue-400 transition-colors flex items-center justify-center"
-            >
-              −
-            </button>
-            <span className="text-2xl font-bold text-gray-900 w-8 text-center">{childrenCount}</span>
-            <button
-              onClick={() => onChange('childrenCount', childrenCount + 1)}
-              className="w-12 h-12 rounded-xl border-2 border-gray-200 text-xl font-bold text-gray-600 hover:border-blue-400 transition-colors flex items-center justify-center"
-            >
-              +
-            </button>
-          </div>
-          <p className={`text-xs mt-1.5 ${childrenCount >= 3 ? 'text-blue-500' : 'text-gray-400'}`}>
-            💡 {childrenHint}
-          </p>
-        </div>
-
-        {/* 최근 2년 이내 출산 */}
-        <div>
-          <p className="text-sm font-semibold text-gray-700 mb-2">
-            최근 2년 이내 자녀 출산 여부
-          </p>
-          <div className="flex gap-3">
-            <button
-              onClick={() => onChange('hasRecentChild', true)}
-              className={`flex-1 py-3 rounded-xl border-2 font-semibold text-sm transition-all ${
-                hasRecentChild ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600'
-              }`}
-            >
-              있음
-            </button>
-            <button
-              onClick={() => onChange('hasRecentChild', false)}
-              className={`flex-1 py-3 rounded-xl border-2 font-semibold text-sm transition-all ${
-                !hasRecentChild ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600'
-              }`}
-            >
-              없음
-            </button>
-          </div>
-          {hasRecentChild && (
-            <p className="text-xs text-blue-600 mt-1.5">출산가구 우대 혜택 적용 가능</p>
-          )}
-        </div>
-
-        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
-          <p className="text-xs text-amber-700">
-            정확한 특별공급 자격은 공고문을 반드시 확인하세요.
-          </p>
+      <div className="mt-8">
+        <p className="text-sm font-semibold text-gray-700 mb-2">최근 2년 안에 아이를 낳았나요?</p>
+        <div className="grid grid-cols-2 gap-3">
+          <ChoiceCard selected={hasRecentChild} onClick={() => onChange('hasRecentChild', true)} title="네" />
+          <ChoiceCard selected={!hasRecentChild} onClick={() => onChange('hasRecentChild', false)} title="아니요" />
         </div>
       </div>
+
+      <WhyAsk>
+        <p>
+          신혼부부·다자녀 같은 특별공급은 일반 청약과 따로 정해진 물량을 먼저 배정해요. 받을 수 있는지 확인하는 데 써요.
+        </p>
+        <p className="text-gray-500">정확한 특별공급 자격은 공고문에서 꼭 확인하세요.</p>
+      </WhyAsk>
     </div>
   );
 }
