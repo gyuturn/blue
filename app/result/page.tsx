@@ -147,7 +147,10 @@ function subscriptionReason(input: EligibilityInput): string {
   return y && m ? `${y}년 ${m}월에 가입` : '가입일을 확인하지 못했어요';
 }
 
+const OWNER_NOTE = '집이 없는 세대만 신청할 수 있어요';
+
 function marriageDescription(input: EligibilityInput, eligible: boolean): string {
+  if (!input.isHomeless) return OWNER_NOTE;
   if (!input.isMarried) return '결혼 7년 이내 부부가 대상이에요';
   if (!input.marriageDate) return '혼인신고 날짜를 입력하지 않았어요';
   const [y, m] = input.marriageDate.split('-').map(Number);
@@ -215,13 +218,17 @@ function ResultView({
       key: 'firstHome',
       label: <Tooltip term={TERM_MAP.saengaeCheot.term} definition={TERM_MAP.saengaeCheot.shortDef}>생애최초 특별공급</Tooltip>,
       eligible: specialSupply.firstHome,
-      description: '집을 가져본 적이 없고 청약통장에 12번 이상 냈다면 확인해 볼 수 있어요 (소득 등 다른 조건도 있어요)',
+      description: input.isHomeless
+        ? '집을 가져본 적이 없고 청약통장에 12번 이상 냈다면 확인해 볼 수 있어요 (소득 등 다른 조건도 있어요)'
+        : OWNER_NOTE,
     },
     {
       key: 'multiChild',
       label: <Tooltip term={TERM_MAP.daJanyeo.term} definition={TERM_MAP.daJanyeo.shortDef}>다자녀 특별공급</Tooltip>,
       eligible: specialSupply.multiChild,
-      description: `만 19세 미만 자녀 ${input.childrenCount ?? 0}명 · 3명 이상이 대상이에요`,
+      description: input.isHomeless
+        ? `만 19세 미만 자녀 ${input.childrenCount ?? 0}명 · 3명 이상이 대상이에요`
+        : OWNER_NOTE,
     },
   ];
 
