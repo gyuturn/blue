@@ -234,7 +234,7 @@ export default function GuidePage() {
                 title="청약통장 가입 기간"
                 maxPoints={17}
                 color="bg-green-500"
-                details="6개월 미만 1점 / 이후 6개월당 1점씩 증가 / 15년 이상 최대 17점"
+                details="6개월 미만 1점 / 6개월~1년 2점 / 이후 1년당 1점씩 증가 / 15년 이상 최대 17점"
               />
             </div>
             <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">

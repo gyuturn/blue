@@ -466,7 +466,7 @@ import { Tooltip } from '@/components/ui/Tooltip';
 
 ```tsx
 <label className="block text-sm font-semibold text-gray-700 mb-2">
-  <Tooltip content="무주택 상태가 지속된 기간입니다. 최대 32점이며 16년 이상이면 만점입니다.">
+  <Tooltip content="무주택 상태가 지속된 기간입니다. 최대 32점이며 15년 이상이면 만점입니다.">
     <span>무주택 기간 <span className="text-blue-400" aria-label="도움말">ⓘ</span></span>
   </Tooltip>
 </label>
