@@ -170,7 +170,7 @@ export default async function HomePage() {
         </div>
 
         {/* Last Score Card */}
-        <LastScoreCard serverRecord={serverRecord} />
+        <LastScoreCard isLoggedIn={!!session} serverRecord={serverRecord} />
 
         {/* CTA Buttons */}
         <div className="space-y-3">

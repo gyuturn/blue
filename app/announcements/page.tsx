@@ -9,11 +9,10 @@ import { getDday, getDdayBadgeStyle, getScoreTierLabel, getGeneralSupplyLabel, g
 import type { AnnouncementDetail } from '@/types';
 import { useFavorites } from '@/hooks/useFavorites';
 import type { SessionUser } from '@/types/auth';
-import { calculateTotalScore, calculateSpecialSupply } from '@/lib/calculator';
 import Tooltip from '@/components/Tooltip';
 import { TERM_MAP } from '@/lib/terms';
 import { readLocalStorage } from '@/hooks/useLocalStorage';
-import { LAST_SCORE_KEY, parseSavedScore, toStoredScoreData } from '@/lib/scoreStorage';
+import { LAST_SCORE_KEY, isEligibilityInput, parseSavedScore, toStoredScoreData } from '@/lib/scoreStorage';
 
 const REGION_OPTIONS = [
   '전체',
@@ -94,42 +93,35 @@ export default function AnnouncementsPage() {
         }
       } catch {}
 
-      // 2) 이 기기에 저장된 마지막 점수
+      // 2) 이 기기 기록과 (로그인 시) 계정 기록 중 더 최근 것
       const saved = parseSavedScore(readLocalStorage(LAST_SCORE_KEY));
-      if (saved) {
-        const fromDevice = toStoredScoreData(saved.input, saved.savedAt);
-        try {
-          sessionStorage.setItem('scoreData', JSON.stringify(fromDevice));
-        } catch {}
-        setScoreData(fromDevice);
-        setAuthChecked(true);
-        return;
-      }
-
-      // 3) 로그인 상태면 DB에서 최근 점수 로드
+      let fromAccount: StoredScoreData | null = null;
       try {
         const meRes = await fetch('/api/auth/me');
         if (meRes.ok) {
           const latestRes = await fetch('/api/scores/latest');
-          if (latestRes.ok) {
+          if (latestRes.status === 200) {
             const latest = await latestRes.json();
-            const input = latest.inputSnapshot as StoredScoreData['input'];
-            const scoreData: StoredScoreData = {
-              input,
-              result: calculateTotalScore(input),
-              specialSupply: calculateSpecialSupply(input),
-              savedAt: new Date(latest.createdAt).getTime(),
-            };
-            sessionStorage.setItem('scoreData', JSON.stringify(scoreData));
-            setScoreData(scoreData);
-            setScoreFromDB(true);
-            setAuthChecked(true);
-            return;
+            if (isEligibilityInput(latest.inputSnapshot)) {
+              fromAccount = toStoredScoreData(latest.inputSnapshot, new Date(latest.createdAt).getTime());
+            }
           }
         }
       } catch {}
 
-      // 4) 모두 없으면 점수 없이 공고 표시
+      const fromDevice = saved ? toStoredScoreData(saved.input, saved.savedAt) : null;
+      const chosen =
+        fromDevice && (!fromAccount || fromDevice.savedAt >= fromAccount.savedAt) ? fromDevice : fromAccount;
+
+      if (chosen) {
+        try {
+          sessionStorage.setItem('scoreData', JSON.stringify(chosen));
+        } catch {}
+        setScoreData(chosen);
+        setScoreFromDB(chosen === fromAccount);
+      }
+
+      // 3) 모두 없으면 점수 없이 공고 표시
       setAuthChecked(true);
     };
 

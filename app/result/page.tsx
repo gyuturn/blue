@@ -7,11 +7,15 @@ import Disclaimer from '@/components/Disclaimer';
 import { calculateTotalScore, calculateSpecialSupply } from '@/lib/calculator';
 import Tooltip from '@/components/Tooltip';
 import { TERM_MAP } from '@/lib/terms';
-import { readLocalStorage, useLocalStorageItem } from '@/hooks/useLocalStorage';
+import { useLocalStorageItem } from '@/hooks/useLocalStorage';
 import {
   CALC_DRAFT_KEY,
   LAST_SCORE_KEY,
+  SYNC_AFTER_LOGIN_KEY,
+  isEligibilityInput,
   parseSavedScore,
+  refreshInput,
+  scorePostBody,
   serializeSavedScore,
 } from '@/lib/scoreStorage';
 import type { EligibilityInput, StoredScoreData } from '@/types';
@@ -38,9 +42,11 @@ function ResultContent() {
     const dataParam = searchParams.get('data');
     if (!dataParam) return null;
     try {
-      const parsed: EligibilityInput = JSON.parse(dataParam);
+      const parsed: EligibilityInput = refreshInput(JSON.parse(dataParam));
       return {
         input: parsed,
+        // 필드가 빠진 예전 링크는 보여주기만 하고 저장하지 않는다
+        storable: isEligibilityInput(parsed),
         scoreResult: calculateTotalScore(parsed),
         specialSupply: calculateSpecialSupply(parsed),
       };
@@ -66,10 +72,8 @@ function ResultContent() {
   }, [data, router]);
 
   useEffect(() => {
-    if (!data || fromSaved) return;
+    if (!data || fromSaved || !data.storable) return;
     setDraftRaw(null);
-    const previous = parseSavedScore(readLocalStorage(LAST_SCORE_KEY));
-    if (previous && JSON.stringify(previous.input) === JSON.stringify(data.input)) return;
     setLastScoreRaw(serializeSavedScore(data.input, Date.now()));
   }, [data, fromSaved, setLastScoreRaw, setDraftRaw]);
 
@@ -79,19 +83,11 @@ function ResultContent() {
   }, [data, lastScoreRaw]);
 
   useEffect(() => {
-    if (!data || fromSaved || sessionUser === undefined || sessionUser === null) return;
+    if (!data || fromSaved || !data.storable || sessionUser === undefined || sessionUser === null) return;
     fetch('/api/scores', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        totalScore: data.scoreResult.totalScore,
-        housingScore: data.scoreResult.homelessScore,
-        dependentScore: data.scoreResult.dependentsScore,
-        subscriptionScore: data.scoreResult.subscriptionScore,
-        tier: data.scoreResult.tier,
-        specialSupply: data.specialSupply,
-        inputSnapshot: data.input,
-      }),
+      body: scorePostBody(data.input),
     })
       .then((res) => {
         if (res.ok) {
@@ -186,7 +182,15 @@ function ResultContent() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
             <span className="text-gray-700 text-sm">이 기기에 저장했어요</span>
-            <a href="/api/auth/kakao" className="ml-auto text-xs text-gray-500 hover:text-blue-600 hover:underline whitespace-nowrap">
+            <a
+              href="/api/auth/kakao"
+              onClick={() => {
+                try {
+                  sessionStorage.setItem(SYNC_AFTER_LOGIN_KEY, '1');
+                } catch {}
+              }}
+              className="ml-auto text-xs text-gray-500 hover:text-blue-600 hover:underline whitespace-nowrap"
+            >
               다른 기기에서도 보기
             </a>
           </div>

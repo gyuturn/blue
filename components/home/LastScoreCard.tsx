@@ -1,23 +1,53 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useRef } from 'react';
 import { useLocalStorageItem } from '@/hooks/useLocalStorage';
 import {
   LAST_SCORE_KEY,
+  SYNC_AFTER_LOGIN_KEY,
   parseSavedScore,
   resultUrl,
+  scorePostBody,
   toStoredScoreData,
   type SavedScoreRecord,
 } from '@/lib/scoreStorage';
 
 interface Props {
+  isLoggedIn: boolean;
   serverRecord: Pick<SavedScoreRecord, 'input' | 'savedAt'> | null;
 }
 
-export default function LastScoreCard({ serverRecord }: Props) {
+export default function LastScoreCard({ isLoggedIn, serverRecord }: Props) {
+  const router = useRouter();
   const [localRaw, setLocalRaw] = useLocalStorageItem(LAST_SCORE_KEY);
   const localRecord = useMemo(() => parseSavedScore(localRaw), [localRaw]);
+  const syncedRef = useRef(false);
+
+  // 결과 화면에서 "다른 기기에서도 보기"로 로그인한 경우에만 이 기기 기록을 계정에 올린다 (공용 기기 보호)
+  useEffect(() => {
+    if (!isLoggedIn || !localRecord || syncedRef.current) return;
+    let requested = false;
+    try {
+      requested = sessionStorage.getItem(SYNC_AFTER_LOGIN_KEY) === '1';
+    } catch {}
+    if (!requested) return;
+    syncedRef.current = true;
+    try {
+      sessionStorage.removeItem(SYNC_AFTER_LOGIN_KEY);
+    } catch {}
+    if (serverRecord && serverRecord.savedAt >= localRecord.savedAt) return;
+    fetch('/api/scores', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: scorePostBody(localRecord.input),
+    })
+      .then((res) => {
+        if (res.ok) router.refresh();
+      })
+      .catch(() => {});
+  }, [isLoggedIn, localRecord, serverRecord, router]);
 
   const record =
     localRecord && (!serverRecord || localRecord.savedAt >= serverRecord.savedAt)
@@ -28,14 +58,20 @@ export default function LastScoreCard({ serverRecord }: Props) {
 
   if (!record) return null;
 
-  const { result } = toStoredScoreData(record.input, record.savedAt);
+  const { result, input } = toStoredScoreData(record.input, record.savedAt);
+  // 서버(UTC)와 브라우저 시간대가 달라도 같은 날짜가 나오도록 고정한다
   const dateLabel = new Date(record.savedAt).toLocaleDateString('ko-KR', {
+    timeZone: 'Asia/Seoul',
     month: 'long',
     day: 'numeric',
   });
 
   const handleClear = () => {
-    if (window.confirm('이 기기에 저장된 청약 점수를 지울까요?')) setLocalRaw(null);
+    if (!window.confirm('이 기기에 저장된 청약 점수를 지울까요?')) return;
+    setLocalRaw(null);
+    try {
+      sessionStorage.removeItem('scoreData');
+    } catch {}
   };
 
   return (
@@ -60,7 +96,7 @@ export default function LastScoreCard({ serverRecord }: Props) {
       </p>
       <div className="flex gap-2 mt-4">
         <Link
-          href={resultUrl(record.input, true)}
+          href={resultUrl(input, true)}
           className="flex-1 text-center py-3 rounded-xl bg-blue-50 text-blue-700 text-sm font-semibold hover:bg-blue-100 transition-colors"
         >
           결과 다시 보기

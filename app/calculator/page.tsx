@@ -7,7 +7,13 @@ import Disclaimer from '@/components/Disclaimer';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { useLocalStorageItem } from '@/hooks/useLocalStorage';
 import { calcHomelessStartDate, calcHomelessYearsFromPolicy } from '@/lib/calculator';
-import { CALC_DRAFT_KEY, parseCalcDraft, resultUrl, serializeCalcDraft } from '@/lib/scoreStorage';
+import {
+  CALC_DRAFT_KEY,
+  parseCalcDraft,
+  refreshInput,
+  resultUrl,
+  serializeCalcDraft,
+} from '@/lib/scoreStorage';
 import type { EligibilityInput } from '@/types';
 
 const REGIONS = [
@@ -67,7 +73,7 @@ export default function CalculatorPage() {
 
   const resumeDraft = () => {
     if (!draft) return;
-    setInput(draft.input);
+    setInput(refreshInput(draft.input));
     setStep(Math.min(Math.max(draft.step, 1), TOTAL_STEPS));
     setResumeDecided(true);
   };
