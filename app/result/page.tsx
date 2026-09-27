@@ -11,8 +11,8 @@ import { useLocalStorageItem } from '@/hooks/useLocalStorage';
 import {
   CALC_DRAFT_KEY,
   LAST_SCORE_KEY,
-  SYNC_AFTER_LOGIN_KEY,
   isEligibilityInput,
+  markSyncAfterLogin,
   parseSavedScore,
   refreshInput,
   scorePostBody,
@@ -184,11 +184,7 @@ function ResultContent() {
             <span className="text-gray-700 text-sm">이 기기에 저장했어요</span>
             <a
               href="/api/auth/kakao"
-              onClick={() => {
-                try {
-                  sessionStorage.setItem(SYNC_AFTER_LOGIN_KEY, '1');
-                } catch {}
-              }}
+              onClick={markSyncAfterLogin}
               className="ml-auto text-xs text-gray-500 hover:text-blue-600 hover:underline whitespace-nowrap"
             >
               다른 기기에서도 보기

@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useLocalStorageItem } from '@/hooks/useLocalStorage';
 import {
   LAST_SCORE_KEY,
-  SYNC_AFTER_LOGIN_KEY,
+  consumeSyncAfterLogin,
   parseSavedScore,
   resultUrl,
   scorePostBody,
@@ -28,15 +28,8 @@ export default function LastScoreCard({ isLoggedIn, serverRecord }: Props) {
   // 결과 화면에서 "다른 기기에서도 보기"로 로그인한 경우에만 이 기기 기록을 계정에 올린다 (공용 기기 보호)
   useEffect(() => {
     if (!isLoggedIn || !localRecord || syncedRef.current) return;
-    let requested = false;
-    try {
-      requested = sessionStorage.getItem(SYNC_AFTER_LOGIN_KEY) === '1';
-    } catch {}
-    if (!requested) return;
     syncedRef.current = true;
-    try {
-      sessionStorage.removeItem(SYNC_AFTER_LOGIN_KEY);
-    } catch {}
+    if (!consumeSyncAfterLogin()) return;
     if (serverRecord && serverRecord.savedAt >= localRecord.savedAt) return;
     fetch('/api/scores', {
       method: 'POST',
