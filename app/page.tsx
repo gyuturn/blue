@@ -25,205 +25,96 @@ async function getLatestServerRecord(
   }
 }
 
+const STEPS = [
+  { title: '집이 있는지', max: 32, description: '집 없이 지낸 기간이 길수록 점수가 올라요' },
+  { title: '함께 사는 가족', max: 35, description: '가족이 많을수록 점수가 올라요' },
+  { title: '청약통장', max: 17, description: '통장을 오래 가지고 있을수록 점수가 올라요' },
+];
+
+const LINKS = [
+  { href: '/announcements', title: '청약 공고 보기', description: '지금 신청할 수 있는 아파트를 지역별로 모았어요' },
+  { href: '/guide', title: '청약이 처음이라면', description: '용어부터 신청 순서까지 쉽게 알려드려요' },
+];
+
 export default async function HomePage() {
   const session = await getSession();
   const serverRecord = session ? await getLatestServerRecord(session.id) : null;
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
-      <div className="max-w-md mx-auto px-4 py-12">
-        {/* Hero Section */}
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-4 shadow-lg">
-            <svg
-              className="w-8 h-8 text-white"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-              />
-            </svg>
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            청약 매칭 가이드
-          </h1>
-          <p className="text-lg text-blue-600 font-medium mb-3">
-            나에게 맞는 청약, 쉽게 찾아보세요
-          </p>
-          <p className="text-gray-600 text-sm leading-relaxed">
-            복잡한 청약 가점을 자동으로 계산하고,
-            <br />
-            내 상황에 맞는 청약 공고를 추천해 드립니다.
-          </p>
-        </div>
-
-        {/* Feature Cards */}
-        <div className="space-y-3 mb-8">
-          <div className="flex items-start gap-3 p-4 bg-white rounded-xl shadow-sm border border-gray-100">
-            <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <svg
-                className="w-5 h-5 text-blue-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                />
-              </svg>
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-800 text-sm">
-                5단계 자격 판정
-              </h3>
-              <p className="text-gray-500 text-xs mt-0.5">
-                간단한 정보 입력으로 청약 자격을 빠르게 확인하세요
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3 p-4 bg-white rounded-xl shadow-sm border border-gray-100">
-            <div className="flex-shrink-0 w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-              <svg
-                className="w-5 h-5 text-green-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                />
-              </svg>
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-800 text-sm">
-                가점 자동 계산
-              </h3>
-              <p className="text-gray-500 text-xs mt-0.5">
-                84점 만점 가점을 자동으로 계산하고 등급(S/A/B/C)을 알려드립니다
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3 p-4 bg-white rounded-xl shadow-sm border border-gray-100">
-            <div className="flex-shrink-0 w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-              <svg
-                className="w-5 h-5 text-purple-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
-                />
-              </svg>
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-800 text-sm">
-                특별공급 자격 확인
-              </h3>
-              <p className="text-gray-500 text-xs mt-0.5">
-                신혼부부, 생애최초, 다자녀 특별공급 자격을 한눈에 확인하세요
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-3 p-4 bg-white rounded-xl shadow-sm border border-gray-100">
-            <div className="flex-shrink-0 w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-              <svg
-                className="w-5 h-5 text-orange-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                />
-              </svg>
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-800 text-sm">
-                청약 공고 큐레이션
-              </h3>
-              <p className="text-gray-500 text-xs mt-0.5">
-                최신 청약 공고를 지역별로 필터링하여 확인하세요
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Last Score Card */}
+    <main className="min-h-screen bg-white">
+      <div className="max-w-md mx-auto px-5 pt-8">
         <LastScoreCard isLoggedIn={!!session} serverRecord={serverRecord} />
 
-        {/* CTA Buttons */}
-        <div className="space-y-3">
-          <Link
-            href="/calculator"
-            className="block w-full text-center py-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl shadow-md transition-colors duration-200"
-          >
-            내 청약 가점 계산하기
-          </Link>
-          <Link
-            href="/announcements"
-            className="block w-full text-center py-3.5 bg-white hover:bg-gray-50 text-blue-600 font-semibold rounded-xl shadow-sm border border-blue-200 transition-colors duration-200"
-          >
-            청약 공고 보기
-          </Link>
-          <Link
-            href="/guide"
-            className="block w-full text-center py-3.5 bg-white hover:bg-gray-50 text-gray-600 font-semibold rounded-xl shadow-sm border border-gray-200 transition-colors duration-200"
-          >
-            청약 입문 가이드 보기
-          </Link>
-        </div>
+        <section className="pt-4 pb-10">
+          <p className="text-sm font-semibold text-blue-600">청약 가점 계산기</p>
+          <h1 className="mt-2 text-[30px] font-bold leading-tight text-gray-900">
+            내 청약 점수,
+            <br />
+            1분이면 알 수 있어요
+          </h1>
+          <p className="mt-4 text-[17px] leading-relaxed text-gray-500">
+            어려운 용어 몰라도 괜찮아요.
+            <br />
+            질문에 답하기만 하면 돼요.
+          </p>
+        </section>
 
-        {/* Guide CTA */}
-        <div className="mt-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-5 border border-blue-100">
-          <p className="text-sm font-bold text-gray-800 mb-1">
-            청약이 처음이신가요?
+        <section className="rounded-3xl bg-gray-50 p-6">
+          <h2 className="text-base font-bold text-gray-900">이렇게 계산해요</h2>
+          <ol className="mt-5 space-y-5">
+            {STEPS.map((item, i) => (
+              <li key={item.title} className="flex gap-4">
+                <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
+                  {i + 1}
+                </span>
+                <div>
+                  <p className="text-[15px] font-semibold text-gray-900">
+                    {item.title}
+                    <span className="ml-1.5 text-sm font-normal text-gray-400">최대 {item.max}점</span>
+                  </p>
+                  <p className="mt-0.5 text-sm text-gray-500">{item.description}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+          <p className="mt-6 border-t border-gray-200 pt-4 text-sm text-gray-600">
+            세 가지를 더하면 <strong className="text-gray-900">84점 만점</strong>이에요. 점수가 높을수록 당첨에 유리해요.
           </p>
-          <p className="text-xs text-gray-500 mb-3">
-            용어부터 절차까지, 청약의 모든 것을 쉽게 알려드립니다.
-          </p>
-          <Link
-            href="/guide"
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-600 hover:text-blue-700 transition-colors"
-          >
-            입문 가이드 보기
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5l7 7-7 7"
-              />
-            </svg>
-          </Link>
-        </div>
+        </section>
+
+        <nav className="mt-8 divide-y divide-gray-100">
+          {LINKS.map((link) => (
+            <Link key={link.href} href={link.href} className="flex items-center justify-between py-4 group">
+              <span>
+                <span className="block text-[15px] font-semibold text-gray-900">{link.title}</span>
+                <span className="block text-sm text-gray-500 mt-0.5">{link.description}</span>
+              </span>
+              <svg
+                className="w-5 h-5 text-gray-300 group-hover:text-gray-500 transition-colors"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+          ))}
+        </nav>
 
         <Disclaimer />
+        <div className="h-36" />
+      </div>
+
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-gray-100 bg-white pt-3">
+        <div className="max-w-md mx-auto px-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <Link
+            href="/calculator"
+            className="block w-full rounded-2xl bg-blue-600 py-4 text-center text-base font-semibold text-white transition-all hover:bg-blue-700 active:scale-[0.99]"
+          >
+            내 점수 알아보기
+          </Link>
+          <p className="mt-2 text-center text-xs text-gray-400">로그인 없이 바로 시작해요</p>
+        </div>
       </div>
     </main>
   );

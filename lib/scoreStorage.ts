@@ -6,7 +6,8 @@ import {
 import type { EligibilityInput, StoredScoreData } from '@/types';
 
 export const LAST_SCORE_KEY = 'blue_last_score_v1';
-export const CALC_DRAFT_KEY = 'blue_calc_draft_v1';
+// v2: 계산기가 6단계(결혼 질문을 2단계로)로 바뀌어 v1의 단계 번호와 호환되지 않는다
+export const CALC_DRAFT_KEY = 'blue_calc_draft_v2';
 // sessionStorage: 사용자가 직접 "다른 기기에서도 보기"를 눌렀을 때만 로그인 후 이 기기 기록을 계정에 올린다
 const SYNC_AFTER_LOGIN_KEY = 'blue_sync_after_login';
 // 로그인을 취소한 뒤 같은 탭에서 다른 사람이 로그인해도 올라가지 않도록 짧게 만료시킨다
