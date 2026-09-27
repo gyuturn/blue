@@ -1,7 +1,15 @@
 'use client';
 
-import { useState, useRef, useEffect, useId, type ReactNode } from 'react';
+import { useState, useRef, useEffect, useId, useSyncExternalStore, type ReactNode } from 'react';
 import { TERM_MAP } from '@/lib/terms';
+
+const COARSE_POINTER = '(pointer: coarse)';
+
+function subscribeCoarsePointer(onChange: () => void) {
+  const mq = window.matchMedia(COARSE_POINTER);
+  mq.addEventListener('change', onChange);
+  return () => mq.removeEventListener('change', onChange);
+}
 
 export interface TooltipProps {
   term: string;
@@ -12,7 +20,11 @@ export interface TooltipProps {
 export default function Tooltip({ term, children, definition }: TooltipProps) {
   const [visible, setVisible] = useState(false);
   const [position, setPosition] = useState<'top' | 'bottom'>('top');
-  const [isMobile, setIsMobile] = useState(false);
+  const isMobile = useSyncExternalStore(
+    subscribeCoarsePointer,
+    () => window.matchMedia(COARSE_POINTER).matches,
+    () => false,
+  );
   const triggerRef = useRef<HTMLSpanElement>(null);
   const tooltipRef = useRef<HTMLSpanElement>(null);
   const tooltipId = useId();
@@ -22,14 +34,6 @@ export default function Tooltip({ term, children, definition }: TooltipProps) {
     definition ??
     Object.values(TERM_MAP).find((t) => t.term === term)?.shortDef ??
     '';
-
-  useEffect(() => {
-    const mq = window.matchMedia('(pointer: coarse)');
-    setIsMobile(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
 
   useEffect(() => {
     if (!visible) return;

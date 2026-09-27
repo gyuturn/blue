@@ -1,44 +1,57 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Announcement } from '@/types';
+import { useLocalStorageItem } from '@/hooks/useLocalStorage';
 
 const LS_KEY = 'blue_favorites';
 
-function getLsFavorites(): string[] {
+function parseLsFavorites(raw: string | null): string[] {
   try {
-    return JSON.parse(localStorage.getItem(LS_KEY) ?? '[]');
+    const parsed = JSON.parse(raw ?? '[]');
+    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
   } catch {
     return [];
   }
 }
 
-function setLsFavorites(ids: string[]) {
-  localStorage.setItem(LS_KEY, JSON.stringify(ids));
-}
-
 // isLoggedIn: true = 로그인, false = 비로그인, null = 아직 확인 중
 export function useFavorites(isLoggedIn: boolean | null) {
-  const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
+  const [serverFavoriteIds, setServerFavoriteIds] = useState<string[]>([]);
   const [favoriteMap, setFavoriteMap] = useState<Record<string, string>>({}); // houseManageNo → rowId
+  const [lsRaw, setLsRaw] = useLocalStorageItem(LS_KEY);
+  const lsFavoriteIds = useMemo(() => parseLsFavorites(lsRaw), [lsRaw]);
+
+  const favoriteIds = useMemo(
+    () => (isLoggedIn === false ? lsFavoriteIds : isLoggedIn ? serverFavoriteIds : []),
+    [isLoggedIn, lsFavoriteIds, serverFavoriteIds],
+  );
+
+  const setFavoriteIds = useCallback(
+    (update: string[] | ((prev: string[]) => string[])) => {
+      if (isLoggedIn === false) {
+        const next = typeof update === 'function' ? update(lsFavoriteIds) : update;
+        setLsRaw(JSON.stringify(next));
+      } else {
+        setServerFavoriteIds(update);
+      }
+    },
+    [isLoggedIn, lsFavoriteIds, setLsRaw],
+  );
 
   useEffect(() => {
-    if (isLoggedIn === null) return; // auth 확인 중 — 아무것도 하지 않음
+    if (!isLoggedIn) return; // 확인 중이거나 비로그인이면 localStorage 값을 그대로 쓴다
 
-    if (isLoggedIn) {
-      fetch('/api/favorites')
-        .then((r) => r.json())
-        .then((json) => {
-          const rows: { id: string; houseManageNo: string }[] = json.data ?? [];
-          setFavoriteIds(rows.map((r) => r.houseManageNo));
-          const map: Record<string, string> = {};
-          rows.forEach((r) => { map[r.houseManageNo] = r.id; });
-          setFavoriteMap(map);
-        })
-        .catch(() => {});
-    } else {
-      setFavoriteIds(getLsFavorites());
-    }
+    fetch('/api/favorites')
+      .then((r) => r.json())
+      .then((json) => {
+        const rows: { id: string; houseManageNo: string }[] = json.data ?? [];
+        setServerFavoriteIds(rows.map((r) => r.houseManageNo));
+        const map: Record<string, string> = {};
+        rows.forEach((r) => { map[r.houseManageNo] = r.id; });
+        setFavoriteMap(map);
+      })
+      .catch(() => {});
   }, [isLoggedIn]);
 
   const toggle = useCallback(
@@ -53,7 +66,6 @@ export function useFavorites(isLoggedIn: boolean | null) {
           ? favoriteIds.filter((x) => x !== houseManageNo)
           : [...favoriteIds, houseManageNo];
         setFavoriteIds(next);
-        setLsFavorites(next);
         return;
       }
 
@@ -86,7 +98,7 @@ export function useFavorites(isLoggedIn: boolean | null) {
           });
       }
     },
-    [favoriteIds, favoriteMap, isLoggedIn]
+    [favoriteIds, favoriteMap, isLoggedIn, setFavoriteIds]
   );
 
   return { favoriteIds, toggle };

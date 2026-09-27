@@ -381,7 +381,7 @@ export default function AnnouncementsPage() {
 
       {selectedAnnouncement && (
         <BottomSheet isOpen={!!selectedAnnouncement} onClose={() => setSelectedAnnouncement(null)}>
-          <AnnouncementDetail announcement={selectedAnnouncement} scoreData={scoreData} />
+          <AnnouncementDetail key={selectedAnnouncement.id} announcement={selectedAnnouncement} scoreData={scoreData} />
         </BottomSheet>
       )}
     </main>
@@ -546,9 +546,8 @@ function AnnouncementDetail({ announcement, scoreData }: { announcement: Announc
   const generalSupply = scoreData ? getGeneralSupplyLabel(scoreData.input) : null;
   const specialLabels = scoreData ? getSpecialSupplyLabels(scoreData.specialSupply, announcement.specialSupplyTypes) : [];
 
+  // 공고가 바뀌면 key로 다시 마운트되므로 로딩 상태 초기화가 필요 없다
   useEffect(() => {
-    setDetailLoading(true);
-    setDetailError(false);
     const houseManageNo = announcement.id;
     const pblancNo = announcement.pblancNo ?? announcement.id;
     fetch(`/api/announcements/detail?houseManageNo=${houseManageNo}&pblancNo=${pblancNo}`)

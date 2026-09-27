@@ -1,15 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { AnnouncementDetail } from '@/types';
 
-function extractBetween(html: string, start: string, end: string): string {
-  const startIdx = html.indexOf(start);
-  if (startIdx === -1) return '';
-  const from = startIdx + start.length;
-  const endIdx = html.indexOf(end, from);
-  if (endIdx === -1) return html.slice(from).replace(/<[^>]+>/g, '').trim();
-  return html.slice(from, endIdx).replace(/<[^>]+>/g, '').trim();
-}
-
 function extractThTd(html: string, thText: string): string {
   const re = new RegExp(`<th[^>]*>\\s*${thText}\\s*</th>\\s*<td[^>]*>([\\s\\S]*?)</td>`, 'i');
   const m = html.match(re);
