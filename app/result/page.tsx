@@ -7,6 +7,17 @@ import Disclaimer from '@/components/Disclaimer';
 import { calculateTotalScore, calculateSpecialSupply } from '@/lib/calculator';
 import Tooltip from '@/components/Tooltip';
 import { TERM_MAP } from '@/lib/terms';
+import { useLocalStorageItem } from '@/hooks/useLocalStorage';
+import {
+  CALC_DRAFT_KEY,
+  LAST_SCORE_KEY,
+  isEligibilityInput,
+  markSyncAfterLogin,
+  parseSavedScore,
+  refreshInput,
+  scorePostBody,
+  serializeSavedScore,
+} from '@/lib/scoreStorage';
 import type { EligibilityInput, StoredScoreData } from '@/types';
 import type { SessionUser } from '@/types/auth';
 
@@ -15,6 +26,10 @@ function ResultContent() {
   const router = useRouter();
   const [sessionUser, setSessionUser] = useState<SessionUser | null | undefined>(undefined);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [lastScoreRaw, setLastScoreRaw] = useLocalStorageItem(LAST_SCORE_KEY);
+  const [, setDraftRaw] = useLocalStorageItem(CALC_DRAFT_KEY);
+  // 홈의 "결과 다시 보기"로 들어온 경우 새 계산이 아니므로 다시 저장하지 않는다
+  const fromSaved = searchParams.get('from') === 'saved';
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -27,9 +42,11 @@ function ResultContent() {
     const dataParam = searchParams.get('data');
     if (!dataParam) return null;
     try {
-      const parsed: EligibilityInput = JSON.parse(dataParam);
+      const parsed: EligibilityInput = refreshInput(JSON.parse(dataParam));
       return {
         input: parsed,
+        // 필드가 빠진 예전 링크는 보여주기만 하고 저장하지 않는다
+        storable: isEligibilityInput(parsed),
         scoreResult: calculateTotalScore(parsed),
         specialSupply: calculateSpecialSupply(parsed),
       };
@@ -55,19 +72,22 @@ function ResultContent() {
   }, [data, router]);
 
   useEffect(() => {
-    if (!data || sessionUser === undefined || sessionUser === null) return;
+    if (!data || fromSaved || !data.storable) return;
+    setDraftRaw(null);
+    setLastScoreRaw(serializeSavedScore(data.input, Date.now()));
+  }, [data, fromSaved, setLastScoreRaw, setDraftRaw]);
+
+  const savedOnDevice = useMemo(() => {
+    const saved = parseSavedScore(lastScoreRaw);
+    return !!data && !!saved && JSON.stringify(saved.input) === JSON.stringify(data.input);
+  }, [data, lastScoreRaw]);
+
+  useEffect(() => {
+    if (!data || fromSaved || !data.storable || sessionUser === undefined || sessionUser === null) return;
     fetch('/api/scores', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        totalScore: data.scoreResult.totalScore,
-        housingScore: data.scoreResult.homelessScore,
-        dependentScore: data.scoreResult.dependentsScore,
-        subscriptionScore: data.scoreResult.subscriptionScore,
-        tier: data.scoreResult.tier,
-        specialSupply: data.specialSupply,
-        inputSnapshot: data.input,
-      }),
+      body: scorePostBody(data.input),
     })
       .then((res) => {
         if (res.ok) {
@@ -77,7 +97,7 @@ function ResultContent() {
         }
       })
       .catch(() => setSaveStatus('error'));
-  }, [data, sessionUser]);
+  }, [data, fromSaved, sessionUser]);
 
   if (!data) {
     return (
@@ -156,10 +176,19 @@ function ResultContent() {
         </div>
 
         {/* Save Status Banner */}
-        {sessionUser === null && (
-          <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 mb-4 flex items-center gap-2">
-            <span className="text-gray-500 text-sm">로그인하면 결과를 저장할 수 있어요</span>
-            <a href="/api/auth/kakao" className="ml-auto text-xs font-semibold text-blue-600 hover:underline whitespace-nowrap">카카오 로그인</a>
+        {sessionUser === null && savedOnDevice && (
+          <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 mb-4 flex items-center gap-2">
+            <svg className="w-4 h-4 text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <span className="text-gray-700 text-sm">이 기기에 저장했어요</span>
+            <a
+              href="/api/auth/kakao"
+              onClick={markSyncAfterLogin}
+              className="ml-auto text-xs text-gray-500 hover:text-blue-600 hover:underline whitespace-nowrap"
+            >
+              다른 기기에서도 보기
+            </a>
           </div>
         )}
         {sessionUser !== undefined && sessionUser !== null && saveStatus === 'saved' && (

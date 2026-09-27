@@ -1,11 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import StepIndicator from '@/components/StepIndicator';
 import Disclaimer from '@/components/Disclaimer';
 import { Tooltip } from '@/components/ui/Tooltip';
+import { useLocalStorageItem } from '@/hooks/useLocalStorage';
 import { calcHomelessStartDate, calcHomelessYearsFromPolicy } from '@/lib/calculator';
+import {
+  CALC_DRAFT_KEY,
+  parseCalcDraft,
+  refreshInput,
+  resultUrl,
+  serializeCalcDraft,
+} from '@/lib/scoreStorage';
 import type { EligibilityInput } from '@/types';
 
 const REGIONS = [
@@ -51,11 +59,35 @@ export default function CalculatorPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [input, setInput] = useState<EligibilityInput>(defaultInput);
+  const [draftRaw, setDraftRaw] = useLocalStorageItem(CALC_DRAFT_KEY);
+  const draft = useMemo(() => parseCalcDraft(draftRaw), [draftRaw]);
+  // 이전 작성분이 있을 때 이어할지 정하기 전에는 draft를 덮어쓰지 않는다
+  const [resumeDecided, setResumeDecided] = useState(false);
+  const showResumeBanner = !!draft && !resumeDecided;
+
+  useEffect(() => {
+    if (!resumeDecided) return;
+    const pristine = step === 1 && JSON.stringify(input) === JSON.stringify(defaultInput);
+    if (!pristine) setDraftRaw(serializeCalcDraft(input, step));
+  }, [input, step, resumeDecided, setDraftRaw]);
+
+  const resumeDraft = () => {
+    if (!draft) return;
+    setInput(refreshInput(draft.input));
+    setStep(Math.min(Math.max(draft.step, 1), TOTAL_STEPS));
+    setResumeDecided(true);
+  };
+
+  const startOver = () => {
+    setDraftRaw(null);
+    setResumeDecided(true);
+  };
 
   const updateInput = <K extends keyof EligibilityInput>(
     key: K,
     value: EligibilityInput[K],
   ) => {
+    setResumeDecided(true);
     setInput((prev) => {
       const next = { ...prev, [key]: value };
       // birthDate, isMarried, marriageDate 변경 시 homelessYears 자동 재계산
@@ -71,18 +103,16 @@ export default function CalculatorPage() {
   };
 
   const handleNext = () => {
+    setResumeDecided(true);
     if (step < TOTAL_STEPS) {
       setStep((s) => s + 1);
     } else {
-      // 결과 페이지로 이동 (쿼리스트링으로 데이터 전달)
-      const params = new URLSearchParams({
-        data: JSON.stringify(input),
-      });
-      router.push(`/result?${params.toString()}`);
+      router.push(resultUrl(input));
     }
   };
 
   const handleBack = () => {
+    setResumeDecided(true);
     if (step > 1) setStep((s) => s - 1);
   };
 
@@ -115,6 +145,29 @@ export default function CalculatorPage() {
             정확한 정보를 입력하면 더 정밀한 결과를 제공합니다.
           </p>
         </div>
+
+        {showResumeBanner && draft && (
+          <div className="bg-white border border-blue-100 rounded-2xl p-4 mb-4 shadow-sm">
+            <p className="text-sm font-semibold text-gray-900">지난번에 입력하던 내용이 있어요</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {STEP_LABELS[Math.min(Math.max(draft.step, 1), TOTAL_STEPS) - 1]} 단계까지 입력했어요
+            </p>
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={resumeDraft}
+                className="flex-1 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors"
+              >
+                이어서 하기
+              </button>
+              <button
+                onClick={startOver}
+                className="flex-1 py-2.5 rounded-xl bg-gray-100 text-gray-700 text-sm font-semibold hover:bg-gray-200 transition-colors"
+              >
+                처음부터
+              </button>
+            </div>
+          </div>
+        )}
 
         <StepIndicator
           currentStep={step}

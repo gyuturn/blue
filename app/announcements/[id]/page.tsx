@@ -6,6 +6,8 @@ import Disclaimer from '@/components/Disclaimer';
 import type { Announcement, StoredScoreData } from '@/types';
 import { getDday, getDdayBadgeStyle, getScoreTierLabel, getGeneralSupplyLabel, getSpecialSupplyLabels } from '@/lib/announcements';
 import { Tooltip } from '@/components/ui/Tooltip';
+import { readLocalStorage } from '@/hooks/useLocalStorage';
+import { LAST_SCORE_KEY, parseSavedScore, toStoredScoreData } from '@/lib/scoreStorage';
 
 export default function AnnouncementDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -25,10 +27,10 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
   const scoreData = useMemo((): StoredScoreData | null => {
     try {
       const stored = sessionStorage.getItem('scoreData');
-      return stored ? (JSON.parse(stored) as StoredScoreData) : null;
-    } catch {
-      return null;
-    }
+      if (stored) return JSON.parse(stored) as StoredScoreData;
+    } catch {}
+    const saved = parseSavedScore(readLocalStorage(LAST_SCORE_KEY));
+    return saved ? toStoredScoreData(saved.input, saved.savedAt) : null;
   }, []);
 
   useEffect(() => {
