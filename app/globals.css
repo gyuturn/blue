@@ -1,28 +1,47 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * 디자인 A안 (#87): Radix Colors(MIT) 기반 팔레트 + Pretendard(OFL-1.1)
+ * 화면 코드는 blue-* / gray-* 유틸리티만 쓰므로 여기서 팔레트를 바꾸면 전 화면에 적용된다.
+ * blue-600 이상은 흰 글씨·옅은 파랑 배경 위에서 WCAG AA(4.5:1)를 넘도록 Radix Blue보다 조금 진하게 잡았다.
+ */
+@theme {
+  --color-blue-50: #e6f4fe;
+  --color-blue-100: #d5efff;
+  --color-blue-200: #acd8fc;
+  --color-blue-300: #8ec8f6;
+  --color-blue-400: #5eb1ef;
+  --color-blue-500: #0090ff;
+  --color-blue-600: #006bd6;
+  --color-blue-700: #0b5cb0;
+  --color-blue-800: #0e4a8a;
+  --color-blue-900: #113264;
+  --color-blue-950: #0d2447;
+
+  --color-gray-50: #f9f9fb;
+  --color-gray-100: #f0f0f3;
+  --color-gray-200: #e0e1e6;
+  --color-gray-300: #cdced6;
+  --color-gray-400: #8b8d98;
+  --color-gray-500: #60646c;
+  --color-gray-600: #4d5159;
+  --color-gray-700: #3a3d44;
+  --color-gray-800: #2a2d33;
+  --color-gray-900: #1c2024;
+  --color-gray-950: #121418;
+
+  --color-background: #ffffff;
+  --color-foreground: #1c2024;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-pretendard), "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  letter-spacing: -0.01em;
 }
 
 @keyframes slide-up {
