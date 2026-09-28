@@ -38,4 +38,4 @@ A안 목업의 `#0090FF`는 흰 글씨 대비가 3.26:1이라 버튼 배경에�
 ## 4. 라이선스
 
 - Radix Colors: MIT (© WorkOS). 색 값만 사용.
-- Pretendard: SIL Open Font License 1.1. 웹폰트로 포함·제공 가능, 폰트 단독 판매 금지. 라이선스 원문은 `node_modules/pretendard/LICENSE`.
+- Pretendard: SIL Open Font License 1.1. 웹폰트로 포함·제공 가능, 폰트 단독 판매 금지. npm 패키지에 LICENSE가 없어 원문(upstream `orioncactus/pretendard`)을 `public/licenses/Pretendard-OFL.txt`로 함께 배포한다(`/licenses/Pretendard-OFL.txt`).
