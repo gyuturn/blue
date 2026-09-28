@@ -10,7 +10,7 @@
 ## 1. 결정
 
 - 색: Radix Colors(MIT)의 Blue / Slate 스케일
-- 폰트: Pretendard Variable(OFL-1.1), npm `pretendard@1.3.9`를 `next/font/local`로 자체 호스팅
+- 폰트: Pretendard Variable(OFL-1.1), npm `pretendard@1.3.9`의 **동적 서브셋 CSS**(`pretendardvariable-dynamic-subset.css`)를 `app/layout.tsx`에서 import해 자체 호스팅. 한글 전체 가변 폰트(2MB) 대신 `unicode-range`별 조각(92개) 중 페이지에 쓰인 글자 범위만 받는다
 - shadcn/ui 컴포넌트는 설치하지 않는다. 지금 화면은 단순 Tailwind 컴포넌트라 radix-ui·cva·tailwind-merge 의존성을 들일 이득이 작다. 색·라운드 규칙만 따른다.
 
 ## 2. 적용 방식
@@ -28,7 +28,9 @@
 | gray-500 | `#60646C` | slate11 | 보조 글씨 | 5.94 |
 | gray-900 | `#1C2024` | slate12 | 본문 | 16.4 |
 
-A안 목업의 `#0090FF`는 흰 글씨 대비가 3.26:1이라 버튼 배경에는 쓰지 않는다.
+A안 목업의 `#0090FF`는 흰 글씨 대비가 3.26:1이라 버튼 배경에는 쓰지 않는다. 가이드 페이지에서 흰 글씨를 올리던 `bg-blue-500` 단계 원·버튼은 `bg-blue-600`/`bg-blue-800`으로, 파란 배경 위 `text-blue-100/200` 문구는 `text-blue-50`(4.6:1 이상)으로 바꿨다.
+
+알려진 한계: `text-gray-400`(3.30:1)은 이전(2.54:1)보다 나아졌지만 본문 크기 글씨에는 AA 미달이다. 쓰임이 40곳 이상이라 별도 이슈로 정리한다.
 
 ## 3. 함께 고친 것
 

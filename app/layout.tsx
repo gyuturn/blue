@@ -1,14 +1,8 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
+// 한글 전체를 담은 2MB 파일 대신, 페이지에 쓰인 글자 범위의 조각 파일만 받는 동적 서브셋
+import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "./globals.css";
 import Header from "@/components/layout/Header";
-
-const pretendard = localFont({
-  src: "../node_modules/pretendard/dist/web/variable/woff2/PretendardVariable.woff2",
-  variable: "--font-pretendard",
-  weight: "45 920",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: {
@@ -48,7 +42,7 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body
-        className={`${pretendard.variable} font-sans antialiased`}
+        className="font-sans antialiased"
       >
         <Header />
         {children}

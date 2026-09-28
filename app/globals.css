@@ -30,13 +30,12 @@
   --color-gray-900: #1c2024;
   --color-gray-950: #121418;
 
+  --font-sans: "Pretendard Variable", Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+
   --color-background: #ffffff;
   --color-foreground: #1c2024;
 }
 
-@theme inline {
-  --font-sans: var(--font-pretendard), "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
-}
 
 body {
   background: var(--color-background);

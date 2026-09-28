@@ -54,13 +54,13 @@ export default function GuidePage() {
           <div className="absolute bottom-10 right-10 w-60 h-60 bg-blue-300 rounded-full blur-3xl" />
         </div>
         <div className="relative max-w-3xl mx-auto px-4 py-16 text-center">
-          <p className="text-blue-200 text-sm font-medium mb-3">
+          <p className="text-blue-50 text-sm font-medium mb-3">
             청약 매칭 가이드
           </p>
           <h1 className="text-3xl md:text-4xl font-black mb-4">
             청약, 처음이세요?
           </h1>
-          <p className="text-blue-100 text-base md:text-lg leading-relaxed max-w-xl mx-auto mb-8">
+          <p className="text-blue-50 text-base md:text-lg leading-relaxed max-w-xl mx-auto mb-8">
             복잡하게만 느껴지는 청약, 이 가이드 하나면 충분합니다.
             <br />
             용어부터 절차까지, 쉽고 빠르게 이해해 보세요.
@@ -68,15 +68,15 @@ export default function GuidePage() {
           <div className="flex flex-wrap justify-center gap-4">
             <div className="bg-white/15 backdrop-blur rounded-xl px-5 py-3 text-center">
               <p className="text-2xl font-black">84점</p>
-              <p className="text-xs text-blue-200 mt-1">가점제 만점</p>
+              <p className="text-xs text-blue-50 mt-1">가점제 만점</p>
             </div>
             <div className="bg-white/15 backdrop-blur rounded-xl px-5 py-3 text-center">
               <p className="text-2xl font-black">6종</p>
-              <p className="text-xs text-blue-200 mt-1">특별공급 유형</p>
+              <p className="text-xs text-blue-50 mt-1">특별공급 유형</p>
             </div>
             <div className="bg-white/15 backdrop-blur rounded-xl px-5 py-3 text-center">
               <p className="text-2xl font-black">5단계</p>
-              <p className="text-xs text-blue-200 mt-1">청약 절차</p>
+              <p className="text-xs text-blue-50 mt-1">청약 절차</p>
             </div>
           </div>
         </div>
@@ -124,7 +124,7 @@ export default function GuidePage() {
                 step: 1,
                 title: '청약통장 개설',
                 desc: '은행에서 주택청약종합저축 계좌를 개설하고 매월 납입을 시작합니다.',
-                color: 'bg-blue-500',
+                color: 'bg-blue-600',
               },
               {
                 step: 2,
@@ -332,7 +332,7 @@ export default function GuidePage() {
         <section className="text-center py-8">
           <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-8 text-white">
             <h2 className="text-xl font-bold mb-2">이제 직접 확인해 볼까요?</h2>
-            <p className="text-blue-100 text-sm mb-6">
+            <p className="text-blue-50 text-sm mb-6">
               내 상황에 맞는 청약 가점과 자격을 바로 계산해 보세요
             </p>
             <div className="flex flex-wrap justify-center gap-3">
@@ -344,7 +344,7 @@ export default function GuidePage() {
               </Link>
               <Link
                 href="/announcements"
-                className="inline-block px-6 py-3 bg-blue-500 text-white font-semibold rounded-xl hover:bg-blue-400 transition-colors border border-blue-400"
+                className="inline-block px-6 py-3 bg-blue-800 text-white font-semibold rounded-xl hover:bg-blue-900 transition-colors border border-blue-400"
               >
                 공고 보러 가기
               </Link>
