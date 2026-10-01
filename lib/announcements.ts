@@ -152,17 +152,13 @@ export async function fetchAnnouncementsFromAPI(region?: string): Promise<Announ
         totalHouseholds: item.TOT_SUPLY_HSHLDCO ? Number(item.TOT_SUPLY_HSHLDCO) : undefined,
         status: status === '일정미정' ? undefined : status,
         supplyKind: item.HOUSE_DTL_SECD_NM === '국민' ? '국민' : item.HOUSE_DTL_SECD_NM === '민영' ? '민영' : undefined,
-        regulation: {
-          speculationOverheated: item.SPECLT_RDN_EARTH_AT === 'Y',
-          adjustedArea: item.MDAT_TRGET_AREA_SECD === 'Y',
-          priceCap: item.PARCPRC_ULS_AT === 'Y',
-        },
+        regulation: parseRegulation(item),
       };
     });
 
     // 특별공급 유형별 세대수는 주택형별 API에만 있으므로 공고별로 병렬 조회해 합산
     const counts = await Promise.all(
-      announcements.map((a) => fetchSpecialSupplyCounts(apiKey, a.id)),
+      announcements.map((a) => (a.id.startsWith('api-') ? null : fetchSpecialSupplyCounts(apiKey, a.id))),
     );
     return announcements.map((a, i) => (counts[i] ? { ...a, specialSupplyCounts: counts[i] } : a));
   } catch (error) {
@@ -174,6 +170,20 @@ export async function fetchAnnouncementsFromAPI(region?: string): Promise<Announ
     console.error('[API] Unexpected error:', error);
     return [];
   }
+}
+
+// Y/N 이외의 값(필드 누락 포함)은 '모름'으로 처리 — 잘못된 '비규제지역' 안내를 막기 위함
+function parseYn(value: string | undefined): boolean | undefined {
+  if (value === 'Y') return true;
+  if (value === 'N') return false;
+  return undefined;
+}
+
+function parseRegulation(item: Record<string, string>): Announcement['regulation'] {
+  const speculationOverheated = parseYn(item.SPECLT_RDN_EARTH_AT);
+  const adjustedArea = parseYn(item.MDAT_TRGET_AREA_SECD);
+  if (speculationOverheated === undefined || adjustedArea === undefined) return undefined;
+  return { speculationOverheated, adjustedArea, priceCap: parseYn(item.PARCPRC_ULS_AT) ?? false };
 }
 
 // 주택형별 공급 API에서 특별공급 유형별 세대수 합산 (실패 시 null → 화면에서 숨김)
@@ -192,7 +202,10 @@ async function fetchSpecialSupplyCounts(apiKey: string, houseManageNo: string): 
       next: { revalidate: 21600 },
     });
     clearTimeout(timeoutId);
-    if (!response.ok) return null;
+    if (!response.ok) {
+      console.error(`[API] special supply error: ${response.status} (${houseManageNo})`);
+      return null;
+    }
 
     const json = await response.json();
     const items: Record<string, string>[] = json?.data ?? [];
@@ -322,7 +335,7 @@ export function getCompetitionAnalysis(
   const matchedSpecial = getSpecialSupplyBadges(announcement, specialSupply).filter((b) => b.matched);
   const specialReasons: CompetitionReason[] = matchedSpecial.map((b) => ({
     tone: 'plus',
-    text: `${b.name} 특별공급 ${b.count.toLocaleString()}세대 — 내 자격으로 신청 가능 (가점과 별개로 뽑아요)`,
+    text: `${b.name} 특별공급 ${b.count.toLocaleString()}세대 — 내 조건에 해당해요 (소득·자산 기준 충족 시 신청 가능, 가점과 별개로 뽑아요)`,
   }));
 
   // 1) 신혼희망타운: 신혼부부·예비신혼·한부모만, 청약 가점 미사용
@@ -330,7 +343,12 @@ export function getCompetitionAnalysis(
     reasons.push({ tone: 'info', text: '신혼희망타운은 신혼부부·예비신혼부부·한부모 가정만 신청할 수 있어요' });
     reasons.push({ tone: 'info', text: '청약 가점(84점)이 아니라 소득·거주기간·납입횟수 등 별도 배점으로 뽑아요' });
     if (!specialSupply.newlyWed) {
-      reasons.push({ tone: 'minus', text: '입력한 정보로는 신혼부부 요건(혼인 7년 이내)에 해당하지 않아요' });
+      reasons.push({
+        tone: 'minus',
+        text: input.isHomeless
+          ? '입력한 정보로는 신혼부부 요건(혼인 7년 이내)에 해당하지 않아요'
+          : '신혼희망타운은 무주택 세대만 신청할 수 있어요',
+      });
       return buildAnalysis('notApplicable', reasons, '신혼부부 전용 공고');
     }
     reasons.push({ tone: 'plus', text: '신혼부부 요건에 해당해요 — 가점이 낮아도 도전할 수 있어요' });
@@ -341,12 +359,14 @@ export function getCompetitionAnalysis(
   const generalEligible = getGeneralSupplyLabel(input).eligible;
   if (!generalEligible) {
     reasons.push({ tone: 'minus', text: '무주택·청약통장 요건을 채우지 못해 일반공급 신청이 어려워요' });
+    if (matchedSpecial.length === 0) return buildAnalysis('notApplicable', reasons);
   }
 
   // 2) 국민주택(공공분양): 가점이 아니라 납입 횟수·저축 총액 순차제
   if (announcement.supplyKind === '국민') {
     reasons.push({ tone: 'info', text: '공공분양 일반공급은 가점이 아니라 청약통장 납입 횟수·저축 총액 순으로 뽑아요' });
     const count = input.subscriptionPaymentCount;
+    if (!generalEligible) return buildAnalysis('fair', [...reasons, ...specialReasons]);
     let d: number;
     if (count >= 120) {
       d = 1;
@@ -358,7 +378,6 @@ export function getCompetitionAnalysis(
       d = 3;
       reasons.push({ tone: 'minus', text: `내 납입 횟수 ${count}회 — 납입 횟수가 적으면 순차제에서 불리해요` });
     }
-    if (!generalEligible) d = 3;
     if (matchedSpecial.length > 0 && d === 3) d = 2;
     return buildAnalysis(levelFromDifficulty(d), [...reasons, ...specialReasons]);
   }
@@ -381,7 +400,7 @@ export function getCompetitionAnalysis(
     if (reg.speculationOverheated || reg.adjustedArea) {
       d += 1;
       const name = reg.speculationOverheated ? '투기과열지구' : '조정대상지역';
-      reasons.push({ tone: 'minus', text: `${name} — 가점제 비중이 높아 가점이 당락을 좌우해요` });
+      reasons.push({ tone: 'minus', text: `${name} — 가점제 비중이 높아 가점이 중요해요` });
     } else if (result.tier === 'B' || result.tier === 'C') {
       d -= 1;
       reasons.push({ tone: 'plus', text: '비규제지역 — 추첨제 물량이 있어 가점이 낮아도 당첨 기회가 있어요' });
@@ -392,7 +411,7 @@ export function getCompetitionAnalysis(
     }
   }
 
-  if (!generalEligible) d = Math.max(d, 3);
+  if (!generalEligible) return buildAnalysis('fair', [...reasons, ...specialReasons]);
   if (matchedSpecial.length > 0 && d >= 3) d = 2;
 
   return buildAnalysis(levelFromDifficulty(d), [...reasons, ...specialReasons]);
