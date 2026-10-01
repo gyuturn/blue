@@ -139,8 +139,9 @@ export async function fetchAnnouncementsFromAPI(region?: string): Promise<Announ
       const status = getSubscriptionStatus(startDate, endDate);
 
       return {
-        id: item.HOUSE_MANAGE_NO ?? `api-${idx}`,
-        pblancNo: item.PBLANC_NO ?? item.HOUSE_MANAGE_NO ?? `api-${idx}`,
+        // API가 숫자로 내려줄 수 있으므로 문자열로 고정
+        id: String(item.HOUSE_MANAGE_NO ?? `api-${idx}`),
+        pblancNo: String(item.PBLANC_NO ?? item.HOUSE_MANAGE_NO ?? `api-${idx}`),
         complexName: item.HOUSE_NM ?? '단지명 없음',
         builder: item.BSNS_MBY_NM ?? '건설사 없음',
         region: item.SUBSCRPT_AREA_CODE_NM ?? '',
@@ -156,11 +157,7 @@ export async function fetchAnnouncementsFromAPI(region?: string): Promise<Announ
       };
     });
 
-    // 특별공급 유형별 세대수는 주택형별 API에만 있으므로 공고별로 병렬 조회해 합산
-    const counts = await Promise.all(
-      announcements.map((a) => (a.id.startsWith('api-') ? null : fetchSpecialSupplyCounts(apiKey, a.id))),
-    );
-    return announcements.map((a, i) => (counts[i] ? { ...a, specialSupplyCounts: counts[i] } : a));
+    return await withSpecialSupplyCounts(apiKey, announcements);
   } catch (error) {
     clearTimeout(timeoutId);
     if (error instanceof Error && error.name === 'AbortError') {
@@ -184,6 +181,26 @@ function parseRegulation(item: Record<string, string>): Announcement['regulation
   const adjustedArea = parseYn(item.MDAT_TRGET_AREA_SECD);
   if (speculationOverheated === undefined || adjustedArea === undefined) return undefined;
   return { speculationOverheated, adjustedArea, priceCap: parseYn(item.PARCPRC_ULS_AT) ?? false };
+}
+
+// 특별공급 유형별 세대수는 주택형별 API에만 있으므로 공고별로 병렬 조회해 합산
+// 부가 정보이므로 어떤 이유로 실패해도 공고 목록은 그대로 반환한다
+async function withSpecialSupplyCounts(apiKey: string, announcements: Announcement[]): Promise<Announcement[]> {
+  try {
+    const counts = await Promise.all(
+      announcements.map((a) =>
+        // 마감 공고는 기본 숨김이라 API 호출량 절약을 위해 생략
+        a.status === '마감' || a.id.startsWith('api-') ? null : fetchSpecialSupplyCounts(apiKey, a.id),
+      ),
+    );
+    return announcements.map((a, i) => {
+      const c = counts[i];
+      return c ? { ...a, specialSupplyCounts: c } : a;
+    });
+  } catch (error) {
+    console.error('[API] special supply enrichment failed:', error);
+    return announcements;
+  }
 }
 
 // 주택형별 공급 API에서 특별공급 유형별 세대수 합산 (실패 시 null → 화면에서 숨김)
