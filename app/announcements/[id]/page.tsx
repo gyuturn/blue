@@ -4,7 +4,8 @@ import { use, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Disclaimer from '@/components/Disclaimer';
 import type { Announcement, StoredScoreData } from '@/types';
-import { getDday, getDdayBadgeStyle, getScoreTierLabel, getGeneralSupplyLabel, getSpecialSupplyLabels } from '@/lib/announcements';
+import { getDday, getDdayBadgeStyle } from '@/lib/announcements';
+import { CompetitionSummary, SpecialSupplyChips } from '@/components/announcements/CompetitionInsight';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { readLocalStorage } from '@/hooks/useLocalStorage';
 import { LAST_SCORE_KEY, parseSavedScore, toStoredScoreData } from '@/lib/scoreStorage';
@@ -55,11 +56,6 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
       : announcement.status === '접수예정'
       ? 'bg-blue-100 text-blue-700'
       : 'bg-gray-100 text-gray-500';
-
-  const tierLabel = scoreData ? getScoreTierLabel(scoreData.result.tier) : null;
-  const generalSupply = scoreData ? getGeneralSupplyLabel(scoreData.input) : null;
-  const specialLabels = scoreData ? getSpecialSupplyLabels(scoreData.specialSupply, announcement.specialSupplyTypes) : [];
-  const hasMatchInfo = tierLabel || generalSupply || specialLabels.length > 0;
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -147,7 +143,7 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
         )}
 
         {/* 내 청약 분석 */}
-        {scoreData && hasMatchInfo && (
+        {scoreData && (
           <div className="bg-blue-50 rounded-2xl border border-blue-100 p-5 mb-4">
             <div className="flex items-center gap-2 mb-3">
               <h2 className="text-sm font-bold text-blue-800">내 청약 분석</h2>
@@ -155,22 +151,9 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
                 <span className="text-blue-400 font-normal text-xs cursor-help" aria-label="도움말">가점제·추첨제 ⓘ</span>
               </Tooltip>
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              {tierLabel && (
-                <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${tierLabel.style}`}>
-                  {tierLabel.text}
-                </span>
-              )}
-              {generalSupply && !generalSupply.eligible && (
-                <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-red-50 text-red-500">
-                  {generalSupply.text}
-                </span>
-              )}
-              {specialLabels.map((label) => (
-                <span key={label} className="text-xs px-2.5 py-1 rounded-full font-semibold bg-purple-100 text-purple-700">
-                  {label}
-                </span>
-              ))}
+            <CompetitionSummary announcement={announcement} scoreData={scoreData} />
+            <div className="mt-3">
+              <SpecialSupplyChips announcement={announcement} scoreData={scoreData} />
             </div>
             {scoreData && (
               <p className="text-xs text-blue-600 mt-2">
