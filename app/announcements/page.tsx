@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import Disclaimer from '@/components/Disclaimer';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import type { Announcement, StoredScoreData } from '@/types';
-import { getDday, getDdayBadgeStyle, getScoreTierLabel, getGeneralSupplyLabel, getSpecialSupplyLabels } from '@/lib/announcements';
+import { getDday, getDdayBadgeStyle } from '@/lib/announcements';
+import { CompetitionSummary, SpecialSupplyChips } from '@/components/announcements/CompetitionInsight';
 import type { AnnouncementDetail } from '@/types';
 import { useFavorites } from '@/hooks/useFavorites';
 import type { SessionUser } from '@/types/auth';
@@ -428,10 +429,6 @@ function AnnouncementCard({
     onSelect(announcement);
   };
 
-  const tierLabel = scoreData ? getScoreTierLabel(scoreData.result.tier) : null;
-  const generalSupply = scoreData ? getGeneralSupplyLabel(scoreData.input) : null;
-  const specialLabels = scoreData ? getSpecialSupplyLabels(scoreData.specialSupply, announcement.specialSupplyTypes) : [];
-
   return (
     <div
       onClick={handleCardClick}
@@ -490,25 +487,10 @@ function AnnouncementCard({
         </div>
       </div>
 
-      {scoreData && (
-        <div className="flex flex-wrap gap-1.5 px-4 pb-3">
-          {tierLabel && (
-            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${tierLabel.style}`}>
-              {tierLabel.text}
-            </span>
-          )}
-          {generalSupply && !generalSupply.eligible && (
-            <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-red-50 text-red-500">
-              {generalSupply.text}
-            </span>
-          )}
-          {specialLabels.map((label) => (
-            <span key={label} className="text-xs px-2 py-0.5 rounded-full font-semibold bg-purple-100 text-purple-700">
-              {label}
-            </span>
-          ))}
-        </div>
-      )}
+      <div className="space-y-3 px-4 pb-3">
+        <SpecialSupplyChips announcement={announcement} scoreData={scoreData} />
+        {scoreData && <CompetitionSummary announcement={announcement} scoreData={scoreData} maxReasons={2} />}
+      </div>
 
       {announcement.pdfUrl && (
         <div className="border-t border-gray-100 px-4 py-3">
@@ -548,10 +530,6 @@ function AnnouncementDetail({ announcement, scoreData }: { announcement: Announc
   const dday = getDday(announcement.subscriptionStartDate, announcement.subscriptionEndDate);
   const ddayBadge = getDdayBadgeStyle(dday);
 
-  const tierLabel = scoreData ? getScoreTierLabel(scoreData.result.tier) : null;
-  const generalSupply = scoreData ? getGeneralSupplyLabel(scoreData.input) : null;
-  const specialLabels = scoreData ? getSpecialSupplyLabels(scoreData.specialSupply, announcement.specialSupplyTypes) : [];
-
   // 공고가 바뀌면 key로 다시 마운트되므로 로딩 상태 초기화가 필요 없다
   useEffect(() => {
     const houseManageNo = announcement.id;
@@ -582,26 +560,16 @@ function AnnouncementDetail({ announcement, scoreData }: { announcement: Announc
       </div>
       <p className="text-sm text-gray-500 mb-4">{announcement.builder} · {announcement.region}</p>
 
-      {/* 내 가점 매칭 */}
-      {scoreData && (
-        <div className="flex flex-wrap gap-1.5 mb-4">
-          {tierLabel && (
-            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${tierLabel.style}`}>
-              {tierLabel.text}
-            </span>
-          )}
-          {generalSupply && !generalSupply.eligible && (
-            <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-red-50 text-red-500">
-              {generalSupply.text}
-            </span>
-          )}
-          {specialLabels.map((label) => (
-            <span key={label} className="text-xs px-2 py-0.5 rounded-full font-semibold bg-purple-100 text-purple-700">
-              {label}
-            </span>
-          ))}
-        </div>
-      )}
+      {/* 내 경쟁 분석 + 특별공급 */}
+      <div className="space-y-3 mb-4">
+        {scoreData && (
+          <div className="bg-blue-50 rounded-xl p-3">
+            <p className="text-xs font-bold text-blue-800 mb-1.5">내 경쟁 분석</p>
+            <CompetitionSummary announcement={announcement} scoreData={scoreData} />
+          </div>
+        )}
+        <SpecialSupplyChips announcement={announcement} scoreData={scoreData} />
+      </div>
 
       {/* 청약홈 상세 데이터 */}
       {detailLoading ? (

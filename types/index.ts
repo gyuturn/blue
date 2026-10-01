@@ -65,11 +65,26 @@ export interface Announcement {
   pdfUrl?: string; // 원문 공고문 URL
   totalHouseholds?: number; // 공급 세대수
   status?: SubscriptionStatus; // 접수 상태
-  specialSupplyTypes?: {
-    newlyWed: boolean;   // 신혼부부 특별공급 있음
-    firstHome: boolean;  // 생애최초 특별공급 있음
-    multiChild: boolean; // 다자녀 특별공급 있음
+  specialSupplyCounts?: SpecialSupplyCounts; // 특별공급 유형별 세대수 (주택형별 API 합산)
+  supplyKind?: '민영' | '국민'; // 민영주택(가점제) / 국민주택(공공분양, 납입횟수 순차제)
+  regulation?: {
+    speculationOverheated: boolean; // 투기과열지구
+    adjustedArea: boolean;          // 조정대상지역
+    priceCap: boolean;              // 분양가상한제
   };
+}
+
+// 특별공급 유형별 세대수
+export interface SpecialSupplyCounts {
+  newlyWed: number;    // 신혼부부
+  firstHome: number;   // 생애최초
+  multiChild: number;  // 다자녀
+  newborn: number;     // 신생아
+  youth: number;       // 청년
+  oldParents: number;  // 노부모부양
+  institution: number; // 기관추천
+  other: number;       // 이전기관·기타
+  generalTotal: number; // 일반공급 합계
 }
 
 // 청약홈 스크래핑 상세 데이터
