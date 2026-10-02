@@ -145,6 +145,7 @@ export async function fetchAnnouncementsFromAPI(region?: string): Promise<Announ
         complexName: item.HOUSE_NM ?? '단지명 없음',
         builder: item.BSNS_MBY_NM ?? '건설사 없음',
         region: item.SUBSCRPT_AREA_CODE_NM ?? '',
+        address: item.HSSPLY_ADRES?.trim() || undefined,
         announcementDate: formatDate(item.RCRIT_PBLANC_DE ?? ''),
         subscriptionStartDate: startDate,
         subscriptionEndDate: endDate,

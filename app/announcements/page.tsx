@@ -492,8 +492,10 @@ function AnnouncementCard({
         {scoreData && <CompetitionSummary announcement={announcement} scoreData={scoreData} maxReasons={2} />}
       </div>
 
-      {announcement.pdfUrl && (
-        <div className="border-t border-gray-100 px-4 py-3">
+      {(announcement.pdfUrl || announcement.address) && (
+        <div className="border-t border-gray-100 px-4 py-3 space-y-2.5">
+          {announcement.address && <CopyAddressButton address={announcement.address} />}
+          {announcement.pdfUrl && (
           <a
             href={announcement.pdfUrl}
             target="_blank"
@@ -516,9 +518,58 @@ function AnnouncementCard({
             </svg>
             공고문 바로가기 (<Tooltip term={TERM_MAP.cheongYangHome.term} definition={TERM_MAP.cheongYangHome.shortDef}>청약홈</Tooltip>)
           </a>
+          )}
         </div>
       )}
     </div>
+  );
+}
+
+async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // 비보안 컨텍스트·권한 거부 시 폴백
+    try {
+      const el = document.createElement('textarea');
+      el.value = text;
+      el.style.position = 'fixed';
+      el.style.opacity = '0';
+      document.body.appendChild(el);
+      el.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(el);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
+function CopyAddressButton({ address }: { address: string }) {
+  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
+
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setState((await copyText(address)) ? 'copied' : 'failed');
+    setTimeout(() => setState('idle'), 2000);
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      aria-label={`주소 복사하기: ${address}`}
+      className="w-full flex items-center justify-center gap-2 text-xs font-semibold text-gray-600 hover:text-gray-800 transition-colors"
+    >
+      <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+      </svg>
+      <span aria-live="polite">
+        {state === 'copied' ? '복사됐어요 ✓ 지도 앱에 붙여넣어 보세요' : state === 'failed' ? '복사에 실패했어요' : '주소 복사하기'}
+      </span>
+    </button>
   );
 }
 
