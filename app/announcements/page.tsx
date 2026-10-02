@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Disclaimer from '@/components/Disclaimer';
 import { BottomSheet } from '@/components/ui/BottomSheet';
@@ -496,28 +496,28 @@ function AnnouncementCard({
         <div className="border-t border-gray-100 px-4 py-3 space-y-2.5">
           {announcement.address && <CopyAddressButton address={announcement.address} />}
           {announcement.pdfUrl && (
-          <a
-            href={announcement.pdfUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="flex items-center justify-center gap-2 text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
-          >
-            <svg
-              className="w-3.5 h-3.5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+            <a
+              href={announcement.pdfUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center justify-center gap-2 text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-              />
-            </svg>
-            공고문 바로가기 (<Tooltip term={TERM_MAP.cheongYangHome.term} definition={TERM_MAP.cheongYangHome.shortDef}>청약홈</Tooltip>)
-          </a>
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                />
+              </svg>
+              공고문 바로가기 (<Tooltip term={TERM_MAP.cheongYangHome.term} definition={TERM_MAP.cheongYangHome.shortDef}>청약홈</Tooltip>)
+            </a>
           )}
         </div>
       )}
@@ -534,13 +534,18 @@ async function copyText(text: string): Promise<boolean> {
     try {
       const el = document.createElement('textarea');
       el.value = text;
+      el.readOnly = true;
       el.style.position = 'fixed';
       el.style.opacity = '0';
       document.body.appendChild(el);
-      el.select();
-      const ok = document.execCommand('copy');
-      document.body.removeChild(el);
-      return ok;
+      try {
+        el.focus();
+        el.select();
+        el.setSelectionRange(0, text.length);
+        return document.execCommand('copy');
+      } finally {
+        document.body.removeChild(el);
+      }
     } catch {
       return false;
     }
@@ -549,25 +554,30 @@ async function copyText(text: string): Promise<boolean> {
 
 function CopyAddressButton({ address }: { address: string }) {
   const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+  }, []);
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
     setState((await copyText(address)) ? 'copied' : 'failed');
-    setTimeout(() => setState('idle'), 2000);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setState('idle'), 2000);
   };
 
   return (
     <button
       type="button"
       onClick={handleCopy}
-      aria-label={`주소 복사하기: ${address}`}
       className="w-full flex items-center justify-center gap-2 text-xs font-semibold text-gray-600 hover:text-gray-800 transition-colors"
     >
       <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
       </svg>
       <span aria-live="polite">
-        {state === 'copied' ? '복사됐어요 ✓ 지도 앱에 붙여넣어 보세요' : state === 'failed' ? '복사에 실패했어요' : '주소 복사하기'}
+        {state === 'copied' ? '복사됐어요 ✓' : state === 'failed' ? '복사에 실패했어요' : '주소 복사하기'}
       </span>
     </button>
   );
