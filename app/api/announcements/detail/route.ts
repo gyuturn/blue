@@ -8,13 +8,63 @@ function extractThTd(html: string, thText: string): string {
   return m[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-function cleanPrice(raw: string): string {
-  // 앞부분 숫자만 추출 (예: "2026000120(02)" → "2026000120")
+// 분양가 단위는 만원. 5천만원(5,000) ~ 500억(5,000,000) 범위만 유효한 분양가로 본다.
+// 공고번호(예: 2026000453) 같은 긴 숫자가 분양가 칸으로 잘못 잡혀 "202600억"으로 표시되던 문제 방지.
+const MIN_PRICE = 5_000;
+const MAX_PRICE = 5_000_000;
+
+function parsePlausiblePrice(raw: string): number | null {
   const match = raw.match(/^[\d,]+/);
-  if (!match) return '';
+  if (!match) return null;
   const num = parseInt(match[0].replace(/,/g, ''), 10);
-  if (isNaN(num)) return '';
-  return num.toLocaleString('ko-KR');
+  if (isNaN(num) || num < MIN_PRICE || num > MAX_PRICE) return null;
+  return num;
+}
+
+function cleanPrice(raw: string): string {
+  const num = parsePlausiblePrice(raw);
+  return num === null ? '' : num.toLocaleString('ko-KR');
+}
+
+const PRICE_HEADER_RE = /분양최고가|공급금액|분양가/;
+
+function extractRowsFromTable(table: string): string[][] {
+  const rows = table.match(/<tr[\s\S]*?<\/tr>/gi) ?? [];
+  return rows.map((row) => {
+    const cellRe = /<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/gi;
+    const cells: string[] = [];
+    let cm;
+    while ((cm = cellRe.exec(row)) !== null) {
+      cells.push(cm[1].replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim());
+    }
+    return cells;
+  }).filter((r) => r.length > 0);
+}
+
+// "분양최고가/공급금액" 표에서 주택형별 분양가를 추출한다. (주택형 → 분양가 만원 단위 문자열)
+function extractPriceByType(html: string): Map<string, string> {
+  const result = new Map<string, string>();
+  const tables = html.match(/<table[\s\S]*?<\/table>/gi) ?? [];
+  for (const table of tables) {
+    if (!PRICE_HEADER_RE.test(table) || !table.includes('주택형')) continue;
+    const rows = extractRowsFromTable(table);
+    const header = rows.find((r) => r.some((c) => PRICE_HEADER_RE.test(c)));
+    const priceIdx = header ? header.findIndex((c) => PRICE_HEADER_RE.test(c)) : -1;
+    for (const row of rows) {
+      if (!row[0] || !/^\d/.test(row[0])) continue;
+      let price: number | null = null;
+      if (header && row.length === header.length && priceIdx >= 0) {
+        price = parsePlausiblePrice(row[priceIdx]);
+      }
+      if (price === null) {
+        // 열 수가 헤더와 다르면(rowspan 등) 유효 범위 숫자 중 최댓값 사용 (분양가 > 계약금·중도금)
+        const nums = row.slice(1).map(parsePlausiblePrice).filter((n): n is number => n !== null);
+        if (nums.length > 0) price = Math.max(...nums);
+      }
+      if (price !== null && !result.has(row[0])) result.set(row[0], price.toLocaleString('ko-KR'));
+    }
+  }
+  return result;
 }
 
 function extractTableRows(html: string, headerKeyword: string): string[][] {
@@ -91,13 +141,14 @@ export async function GET(request: Request) {
     // 주택형별 공급 테이블
     const unitRows = extractTableRows(html, '주택형');
     // 헤더 행 제거 후 데이터 행만 추출 (주택형 셀이 숫자로 시작하는 행)
+    const priceByType = extractPriceByType(html);
     const units = unitRows
       .filter((row) => row[0] && /^\d/.test(row[0]))
       .map((row) => ({
         type: (row[0] ?? '').trim(),
         supplyArea: row[1] ?? '',
         totalCount: row[4] ?? row[3] ?? '',
-        price: cleanPrice(row[5] ?? row[6] ?? ''),
+        price: priceByType.get(row[0]) ?? cleanPrice(row[5] ?? row[6] ?? ''),
       }));
 
     const detail: AnnouncementDetail = {
