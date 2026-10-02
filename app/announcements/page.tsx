@@ -46,7 +46,17 @@ function formatPriceKorean(raw: string): string {
   return `${만.toLocaleString('ko-KR')}만원`;
 }
 
-const tierBadgeStyle: Record<string, string> = {
+// 주택형 코드(예: 059.7421B)의 앞 숫자 = 전용면적(㎡) → "전용 59.74㎡ · 약 18평"
+function formatAreaWithPyeong(unitType: string): string | null {
+  const m = unitType.match(/^(\d+(?:\.\d+)?)/);
+  if (!m) return null;
+  const sqm = parseFloat(m[1]);
+  if (!isFinite(sqm) || sqm <= 0) return null;
+  const pyeong = Math.round(sqm * 0.3025);
+  return `전용 ${sqm.toFixed(2)}㎡ · 약 ${pyeong}평`;
+}
+
+const tierBadgeStyle:Record<string, string> = {
   S: 'bg-yellow-100 text-yellow-700',
   A: 'bg-blue-100 text-blue-700',
   B: 'bg-green-100 text-green-700',
@@ -692,6 +702,9 @@ function AnnouncementDetail({ announcement, scoreData }: { announcement: Announc
                 {detail.units.map((u, i) => (
                   <div key={i} className="rounded-xl border border-gray-100 bg-white px-3 py-2.5">
                     <p className="text-xs font-semibold text-gray-800 mb-1">{u.type}</p>
+                    {formatAreaWithPyeong(u.type) && (
+                      <p className="text-xs text-gray-500 mb-1">{formatAreaWithPyeong(u.type)}</p>
+                    )}
                     <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-600">
                       <span>세대수 <span className="font-medium text-gray-800">{u.totalCount || '-'}</span></span>
                       <span>분양가 <span className="font-medium text-gray-800">{u.price ? formatPriceKorean(u.price) : '-'}</span></span>
