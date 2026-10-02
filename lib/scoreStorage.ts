@@ -95,7 +95,10 @@ export function refreshInput(input: EligibilityInput): EligibilityInput {
 }
 
 export function isSameInput(a: EligibilityInput, b: EligibilityInput): boolean {
-  return JSON.stringify(refreshInput(a)) === JSON.stringify(refreshInput(b));
+  // jsonb는 키 순서를 바꿔 돌려주므로 문자열이 아니라 필드별로 비교한다
+  const x = refreshInput(a);
+  const y = refreshInput(b);
+  return [...BOOLEAN_FIELDS, ...STRING_FIELDS, ...NUMBER_FIELDS].every((k) => x[k] === y[k]);
 }
 
 // 로그인 상태에서 이 기기 기록을 계정에 올릴지 물어볼 때인지 판단한다

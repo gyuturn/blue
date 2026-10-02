@@ -42,10 +42,10 @@ export default function LastScoreCard({ isLoggedIn, serverRecord }: Props) {
         body: scorePostBody(localRecord.input),
       });
       if (!res.ok) throw new Error();
+      // 서버 기록이 갱신돼 카드가 사라질 때까지 버튼을 잠가 중복 저장을 막는다
       router.refresh();
     } catch {
       setSyncError(true);
-    } finally {
       setSyncing(false);
     }
   };
