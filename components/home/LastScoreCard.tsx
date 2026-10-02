@@ -2,14 +2,15 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo, useState } from 'react';
 import { useLocalStorageItem } from '@/hooks/useLocalStorage';
 import {
   LAST_SCORE_KEY,
-  consumeSyncAfterLogin,
+  SYNC_DISMISSED_KEY,
   parseSavedScore,
   resultUrl,
   scorePostBody,
+  shouldOfferSync,
   toStoredScoreData,
   type SavedScoreRecord,
 } from '@/lib/scoreStorage';
@@ -23,24 +24,35 @@ export default function LastScoreCard({ isLoggedIn, serverRecord }: Props) {
   const router = useRouter();
   const [localRaw, setLocalRaw] = useLocalStorageItem(LAST_SCORE_KEY);
   const localRecord = useMemo(() => parseSavedScore(localRaw), [localRaw]);
-  const syncedRef = useRef(false);
+  const [dismissedRaw, setDismissedRaw] = useLocalStorageItem(SYNC_DISMISSED_KEY);
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState(false);
 
-  // 결과 화면에서 "다른 기기에서도 보기"로 로그인한 경우에만 이 기기 기록을 계정에 올린다 (공용 기기 보호)
-  useEffect(() => {
-    if (!isLoggedIn || !localRecord || syncedRef.current) return;
-    syncedRef.current = true;
-    if (!consumeSyncAfterLogin()) return;
-    if (serverRecord && serverRecord.savedAt >= localRecord.savedAt) return;
-    fetch('/api/scores', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: scorePostBody(localRecord.input),
-    })
-      .then((res) => {
-        if (res.ok) router.refresh();
-      })
-      .catch(() => {});
-  }, [isLoggedIn, localRecord, serverRecord, router]);
+  // 로그인했는데 이 기기 기록이 계정에 없으면, 올리기 전에 한 번 물어본다 (공용 기기 보호)
+  const offerSync = isLoggedIn && shouldOfferSync(localRecord, serverRecord, dismissedRaw);
+
+  const handleSync = async () => {
+    if (!localRecord || syncing) return;
+    setSyncing(true);
+    setSyncError(false);
+    try {
+      const res = await fetch('/api/scores', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: scorePostBody(localRecord.input),
+      });
+      if (!res.ok) throw new Error();
+      router.refresh();
+    } catch {
+      setSyncError(true);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleDismissSync = () => {
+    if (localRecord) setDismissedRaw(String(localRecord.savedAt));
+  };
 
   const record =
     localRecord && (!serverRecord || localRecord.savedAt >= serverRecord.savedAt)
@@ -87,6 +99,31 @@ export default function LastScoreCard({ isLoggedIn, serverRecord }: Props) {
       <p className="text-xs text-gray-400 mt-1">
         {dateLabel} 계산 · {record.source === 'device' ? '이 기기에 저장' : '내 계정에 저장'}
       </p>
+      {offerSync && (
+        <div className="mt-4 rounded-xl bg-blue-50 p-4">
+          <p className="text-sm font-semibold text-gray-900">이 기기의 점수를 내 계정에 저장할까요?</p>
+          <p className="mt-1 text-xs text-gray-500">
+            저장하면 다른 기기에서 로그인해도 이 점수를 볼 수 있어요. 내 기기가 아니라면 저장하지 마세요.
+          </p>
+          {syncError && <p className="mt-1 text-xs text-red-600">저장하지 못했어요. 잠시 후 다시 시도해 주세요.</p>}
+          <div className="mt-3 flex gap-2">
+            <button
+              onClick={handleSync}
+              disabled={syncing}
+              className="flex-1 rounded-lg bg-blue-600 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            >
+              {syncing ? '저장 중...' : '저장하기'}
+            </button>
+            <button
+              onClick={handleDismissSync}
+              disabled={syncing}
+              className="flex-1 rounded-lg bg-white py-2 text-sm font-semibold text-gray-600"
+            >
+              저장 안 함
+            </button>
+          </div>
+        </div>
+      )}
       <div className="flex gap-2 mt-4">
         <Link
           href={resultUrl(input, true)}

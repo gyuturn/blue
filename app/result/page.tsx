@@ -13,7 +13,6 @@ import {
   CALC_DRAFT_KEY,
   LAST_SCORE_KEY,
   isEligibilityInput,
-  markSyncAfterLogin,
   parseSavedScore,
   refreshInput,
   scorePostBody,
@@ -274,7 +273,6 @@ function ResultView({
             <span className="text-sm text-gray-700">이 기기에 저장했어요</span>
             <a
               href="/api/auth/kakao"
-              onClick={markSyncAfterLogin}
               className="ml-auto whitespace-nowrap text-xs text-gray-500 hover:text-blue-600 hover:underline"
             >
               다른 기기에서도 보기
