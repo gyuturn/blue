@@ -2,15 +2,17 @@ import Link from 'next/link';
 import Disclaimer from '@/components/Disclaimer';
 import LastScoreCard from '@/components/home/LastScoreCard';
 import { getSession } from '@/lib/auth/session';
-import { db } from '@/lib/db';
+import { db, describeDbError } from '@/lib/db';
 import { subscriptionScores } from '@/lib/db/schema';
 import { isEligibilityInput } from '@/lib/scoreStorage';
 import { eq, desc } from 'drizzle-orm';
 import type { EligibilityInput } from '@/types';
 
-async function getLatestServerRecord(
-  userId: string,
-): Promise<{ input: EligibilityInput; savedAt: number } | null> {
+type ServerRecordResult =
+  | { ok: true; record: { input: EligibilityInput; savedAt: number } | null }
+  | { ok: false };
+
+async function getLatestServerRecord(userId: string): Promise<ServerRecordResult> {
   try {
     const [latest] = await db
       .select()
@@ -18,10 +20,12 @@ async function getLatestServerRecord(
       .where(eq(subscriptionScores.userId, userId))
       .orderBy(desc(subscriptionScores.createdAt))
       .limit(1);
-    if (!latest || !isEligibilityInput(latest.inputSnapshot)) return null;
-    return { input: latest.inputSnapshot, savedAt: new Date(latest.createdAt).getTime() };
-  } catch {
-    return null;
+    if (!latest || !isEligibilityInput(latest.inputSnapshot)) return { ok: true, record: null };
+    return { ok: true, record: { input: latest.inputSnapshot, savedAt: new Date(latest.createdAt).getTime() } };
+  } catch (err) {
+    // 조회 실패를 "기록 없음"으로 취급하면 저장 제안이 떠서 실패가 뻔한 버튼을 누르게 된다
+    console.error('[db] home latest score failed:', describeDbError(err));
+    return { ok: false };
   }
 }
 
@@ -38,12 +42,16 @@ const LINKS = [
 
 export default async function HomePage() {
   const session = await getSession();
-  const serverRecord = session ? await getLatestServerRecord(session.id) : null;
+  const server = session ? await getLatestServerRecord(session.id) : null;
 
   return (
     <main className="min-h-screen bg-white">
       <div className="max-w-md mx-auto px-5 pt-8">
-        <LastScoreCard isLoggedIn={!!session} serverRecord={serverRecord} />
+        <LastScoreCard
+          isLoggedIn={!!session}
+          serverRecord={server?.ok ? server.record : null}
+          serverAvailable={server?.ok ?? false}
+        />
 
         <section className="pt-4 pb-10">
           <p className="text-sm font-semibold text-blue-600">청약 가점 계산기</p>
