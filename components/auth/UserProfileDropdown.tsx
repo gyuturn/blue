@@ -30,21 +30,21 @@ export default function UserProfileDropdown({ user }: Props) {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+        className="flex items-center gap-1.5 whitespace-nowrap px-2 py-1.5 sm:gap-2 sm:px-3 rounded-lg hover:bg-gray-100 transition-colors"
       >
         {user.profileImage ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={user.profileImage}
             alt={user.nickname}
-            className="w-7 h-7 rounded-full object-cover"
+            className="w-7 h-7 shrink-0 rounded-full object-cover"
           />
         ) : (
-          <div className="w-7 h-7 rounded-full bg-yellow-400 flex items-center justify-center text-xs font-bold text-yellow-900">
+          <div className="w-7 h-7 shrink-0 rounded-full bg-yellow-400 flex items-center justify-center text-xs font-bold text-yellow-900">
             {user.nickname[0]}
           </div>
         )}
-        <span className="text-sm font-medium text-gray-700">{user.nickname}</span>
+        <span className="hidden text-sm font-medium text-gray-700 sm:inline">{user.nickname}</span>
         <svg
           className={`w-3 h-3 text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`}
           viewBox="0 0 12 12"

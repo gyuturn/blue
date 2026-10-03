@@ -18,34 +18,43 @@ import {
 interface Props {
   isLoggedIn: boolean;
   serverRecord: Pick<SavedScoreRecord, 'input' | 'savedAt'> | null;
+  // 계정 기록 조회에 성공했는지 — 실패하면 계정에 이미 있는지 알 수 없고 저장도 실패하므로 묻지 않는다
+  serverAvailable: boolean;
 }
 
-export default function LastScoreCard({ isLoggedIn, serverRecord }: Props) {
+type SyncError = 'expired' | 'failed' | null;
+
+export default function LastScoreCard({ isLoggedIn, serverRecord, serverAvailable }: Props) {
   const router = useRouter();
   const [localRaw, setLocalRaw] = useLocalStorageItem(LAST_SCORE_KEY);
   const localRecord = useMemo(() => parseSavedScore(localRaw), [localRaw]);
   const [dismissedRaw, setDismissedRaw] = useLocalStorageItem(SYNC_DISMISSED_KEY);
   const [syncing, setSyncing] = useState(false);
-  const [syncError, setSyncError] = useState(false);
+  const [syncError, setSyncError] = useState<SyncError>(null);
 
   // 로그인했는데 이 기기 기록이 계정에 없으면, 올리기 전에 한 번 물어본다 (공용 기기 보호)
-  const offerSync = isLoggedIn && shouldOfferSync(localRecord, serverRecord, dismissedRaw);
+  const offerSync = isLoggedIn && serverAvailable && shouldOfferSync(localRecord, serverRecord, dismissedRaw);
 
   const handleSync = async () => {
     if (!localRecord || syncing) return;
     setSyncing(true);
-    setSyncError(false);
+    setSyncError(null);
     try {
       const res = await fetch('/api/scores', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: scorePostBody(localRecord.input),
       });
+      if (res.status === 401) {
+        setSyncError('expired');
+        setSyncing(false);
+        return;
+      }
       if (!res.ok) throw new Error();
       // 서버 기록이 갱신돼 카드가 사라질 때까지 버튼을 잠가 중복 저장을 막는다
       router.refresh();
     } catch {
-      setSyncError(true);
+      setSyncError('failed');
       setSyncing(false);
     }
   };
@@ -105,7 +114,13 @@ export default function LastScoreCard({ isLoggedIn, serverRecord }: Props) {
           <p className="mt-1 text-xs text-gray-500">
             저장하면 다른 기기에서 로그인해도 이 점수를 볼 수 있어요. 내 기기가 아니라면 저장하지 마세요.
           </p>
-          {syncError && <p className="mt-1 text-xs text-red-600">저장하지 못했어요. 잠시 후 다시 시도해 주세요.</p>}
+          {syncError && (
+            <p className="mt-1 text-xs text-red-600">
+              {syncError === 'expired'
+                ? '로그인이 만료됐어요. 다시 로그인한 뒤 저장해 주세요.'
+                : '저장하지 못했어요. 잠시 후 다시 시도해 주세요.'}
+            </p>
+          )}
           <div className="mt-3 flex gap-2">
             <button
               onClick={handleSync}
