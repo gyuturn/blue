@@ -296,6 +296,43 @@ function WhyAsk({ children }: { children: ReactNode }) {
   );
 }
 
+function ResidentRegistrationHelp({ context }: { context: 'home' | 'family' }) {
+  return (
+    <details className="group mt-6 rounded-2xl bg-gray-50 px-4 py-3 text-sm text-gray-600">
+      <summary className="flex cursor-pointer list-none items-center justify-between font-medium text-gray-700 [&::-webkit-details-marker]:hidden">
+        주민등록등본이 같다는 게 뭐예요?
+        <svg
+          className="w-4 h-4 text-gray-400 transition-transform group-open:rotate-180"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </summary>
+      <div className="mt-2 space-y-1.5 leading-relaxed">
+        <p>
+          실제로 같이 사는지가 아니라, <strong className="text-gray-800">전입신고한 주소가 같은지</strong>로 봐요.
+        </p>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>부모님과 따로 살고, 이사하면서 전입신고를 했다면 → 등본이 달라요</li>
+          <li>따로 살아도 주소를 옮기지 않았다면 → 아직 같은 등본이에요</li>
+          <li>같은 집에 살아도 세대분리를 했다면 → 등본이 달라요</li>
+          <li>배우자는 등본이 달라도 같은 가족으로 봐요</li>
+        </ul>
+        {context === 'home' ? (
+          <p>부모님과 등본이 다르면, 부모님 집은 내가 집이 있는지 따질 때 들어가지 않아요.</p>
+        ) : (
+          <p>부모님·조부모님은 3년 이상 계속 나와 같은 등본에 있어야 가족으로 인정돼요.</p>
+        )}
+        <p className="text-gray-500">
+          잘 모르겠다면 정부24에서 주민등록등본을 무료로 뽑아 보세요. 나와 함께 이름이 나오는 사람이 같은 등본이에요.
+        </p>
+      </div>
+    </details>
+  );
+}
+
 function ChoiceCard({
   selected,
   onClick,
@@ -382,20 +419,20 @@ function HomeStep({
     <div>
       <Question
         title="지금 내 집이 있나요?"
-        description="나, 배우자, 같은 주민등록등본에 있는 가족 중 한 명이라도 집이 있으면 '있어요'를 골라 주세요."
+        description="나, 배우자, 그리고 나와 주민등록등본이 같은 가족 중 한 명이라도 집이 있으면 '있어요'를 골라 주세요."
       />
       <div className="space-y-3">
         <ChoiceCard
           selected={isHomeless}
           onClick={() => onChange('isHomeless', true)}
           title="없어요"
-          description="나도, 함께 사는 가족도 집이 없어요"
+          description="나도, 등본이 같은 가족도 집이 없어요"
         />
         <ChoiceCard
           selected={!isHomeless}
           onClick={() => onChange('isHomeless', false)}
           title="있어요"
-          description="나나 가족 중 누군가 집이 있어요"
+          description="나나 등본이 같은 가족 중 누군가 집이 있어요"
         />
       </div>
 
@@ -432,6 +469,8 @@ function HomeStep({
           집이 있으면 무주택 점수는 0점이에요. 나머지 항목은 계속 계산해 드릴게요.
         </Note>
       )}
+
+      <ResidentRegistrationHelp context="home" />
 
       <WhyAsk>
         <p>집이 없는 기간이 길수록 청약 점수가 올라가요. 최대 32점이에요.</p>
@@ -509,8 +548,8 @@ function FamilyStep({
   return (
     <div>
       <Question
-        title="함께 사는 가족은 몇 명인가요?"
-        description="나는 빼고 세어 주세요. 배우자와, 같은 주민등록등본에 있는 부모님·조부모님, 자녀가 해당돼요."
+        title="나와 등본이 같은 가족은 몇 명인가요?"
+        description="나는 빼고 세어 주세요. 배우자(등본이 달라도 돼요)와, 나와 주민등록등본이 같은 부모님·조부모님, 자녀가 해당돼요."
       />
 
       <div className="flex items-center justify-center gap-8 py-4">
@@ -541,8 +580,10 @@ function FamilyStep({
         <span className="text-blue-600"> / 35점</span>
       </Note>
 
+      <ResidentRegistrationHelp context="family" />
+
       <WhyAsk>
-        <p>함께 사는 가족이 많을수록 점수가 올라가요. 0명이면 5점, 1명마다 5점씩 더해서 6명 이상이면 35점이에요.</p>
+        <p>등본이 같은 가족이 많을수록 점수가 올라가요. 0명이면 5점, 1명마다 5점씩 더해서 6명 이상이면 35점이에요.</p>
         <p className="text-gray-500">
           배우자는 등본이 달라도 인정돼요. 부모님·조부모님은 3년 이상 같은 등본에 있고 집이 없어야 인정되고, 손주는 그
           부모가 없을 때만 인정돼요.
