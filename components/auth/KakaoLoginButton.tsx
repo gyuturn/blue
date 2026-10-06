@@ -10,7 +10,7 @@ export default function KakaoLoginButton() {
     <button
       onClick={handleLogin}
       title="카카오로 로그인하면 다른 기기에서도 내 점수를 볼 수 있어요"
-      className="px-3 py-1.5 rounded-lg text-sm text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+      className="whitespace-nowrap px-3 py-1.5 rounded-lg text-sm text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
     >
       로그인
     </button>
