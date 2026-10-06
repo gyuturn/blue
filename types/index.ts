@@ -64,6 +64,7 @@ export interface Announcement {
   complexName: string; // 단지명
   builder: string; // 건설사
   region: string; // 지역
+  address?: string; // 공급위치 (예: 서울특별시 강남구 ○○동 123)
   announcementDate: string; // 모집공고일
   subscriptionStartDate: string; // 청약 접수 시작일
   subscriptionEndDate: string; // 청약 접수 종료일

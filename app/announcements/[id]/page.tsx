@@ -6,6 +6,8 @@ import Disclaimer from '@/components/Disclaimer';
 import type { Announcement, HouseType, StoredScoreData } from '@/types';
 import { getDday, getDdayBadgeStyle, getScoreTierLabel, getGeneralSupplyLabel, getSpecialSupplyLabels } from '@/lib/announcements';
 import { Tooltip } from '@/components/ui/Tooltip';
+import { CopyButton } from '@/components/ui/CopyButton';
+import { getMapSearchUrl } from '@/lib/maps';
 
 export default function AnnouncementDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -77,6 +79,8 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
   const generalSupply = scoreData ? getGeneralSupplyLabel(scoreData.input) : null;
   const specialLabels = scoreData ? getSpecialSupplyLabels(scoreData.specialSupply, announcement.specialSupplyTypes) : [];
   const hasMatchInfo = tierLabel || generalSupply || specialLabels.length > 0;
+  const naverMapUrl = announcement.address ? getMapSearchUrl('naver', announcement.address) : null;
+  const kakaoMapUrl = announcement.address ? getMapSearchUrl('kakao', announcement.address) : null;
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -114,6 +118,41 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
             {announcement.builder} · {announcement.region} · {announcement.houseType}
           </p>
         </div>
+
+        {/* 단지 위치 */}
+        {announcement.address && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
+            <h2 className="text-sm font-bold text-gray-700 mb-2">단지 위치</h2>
+            <p className="text-sm text-gray-800 break-keep mb-4">{announcement.address}</p>
+            <div className="grid grid-cols-3 gap-2">
+              <CopyButton
+                text={announcement.address}
+                label="주소 복사"
+                className="py-2.5 border border-gray-200 text-gray-700 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-colors"
+              />
+              {naverMapUrl && (
+                <a
+                  href={naverMapUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="py-2.5 text-center bg-green-500 text-white rounded-xl text-xs font-semibold hover:bg-green-600 transition-colors"
+                >
+                  네이버지도
+                </a>
+              )}
+              {kakaoMapUrl && (
+                <a
+                  href={kakaoMapUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="py-2.5 text-center bg-yellow-300 text-gray-900 rounded-xl text-xs font-semibold hover:bg-yellow-400 transition-colors"
+                >
+                  카카오맵
+                </a>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* 청약 일정 */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
