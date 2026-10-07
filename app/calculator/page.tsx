@@ -9,6 +9,9 @@ import {
   calcHomelessStartDate,
   calcHomelessYearsFromPolicy,
   calculateTotalScore,
+  formatMonthsAsPeriod,
+  getSubscriptionMonths,
+  startDateFromMonths,
 } from '@/lib/calculator';
 import {
   CALC_DRAFT_KEY,
@@ -593,13 +596,11 @@ function FamilyStep({
   );
 }
 
-function formatMonthsToYears(months: number): string {
-  if (months <= 0) return '';
-  const years = Math.floor(months / 12);
-  const remaining = months % 12;
-  if (years === 0) return `${months}개월 동안 냈어요`;
-  if (remaining === 0) return `약 ${years}년 동안 냈어요`;
-  return `약 ${years}년 ${remaining}개월 동안 냈어요`;
+function getPaymentHint(count: number): string {
+  if (count <= 0) return '';
+  if (count >= 24) return '1순위 납입 횟수 조건을 채웠어요 (투기과열지구 등은 24번)';
+  if (count >= 12) return '수도권 1순위 납입 횟수(12번)를 채웠어요. 투기과열지구 등은 24번이 필요해요';
+  return '수도권 1순위는 12번 이상 내야 해요';
 }
 
 function formatWithComma(value: number): string {
@@ -621,25 +622,88 @@ function AccountStep({
   onChange: OnChange;
 }) {
   const [displayBalance, setDisplayBalance] = useState(formatWithComma(subscriptionBalance));
-  const paymentHint = formatMonthsToYears(subscriptionPaymentCount);
+  const paymentHint = getPaymentHint(subscriptionPaymentCount);
+  const initialMonths = getSubscriptionMonths(subscriptionStartDate);
+  const [periodYears, setPeriodYears] = useState(
+    initialMonths === null ? '' : String(Math.floor(initialMonths / 12)),
+  );
+  const [periodMonths, setPeriodMonths] = useState(
+    initialMonths === null ? '' : String(initialMonths % 12),
+  );
+  const elapsedMonths = getSubscriptionMonths(subscriptionStartDate);
+
+  const handlePeriodChange = (yearsRaw: string, monthsRaw: string) => {
+    setPeriodYears(yearsRaw);
+    setPeriodMonths(monthsRaw);
+    if (yearsRaw === '' && monthsRaw === '') {
+      onChange('subscriptionStartDate', '');
+      return;
+    }
+    const total = (Number(yearsRaw) || 0) * 12 + (Number(monthsRaw) || 0);
+    onChange('subscriptionStartDate', startDateFromMonths(total));
+  };
+
+  const handleStartDateChange = (value: string) => {
+    onChange('subscriptionStartDate', value);
+    const months = getSubscriptionMonths(value);
+    setPeriodYears(months === null ? '' : String(Math.floor(months / 12)));
+    setPeriodMonths(months === null ? '' : String(months % 12));
+  };
 
   return (
     <div>
       <Question
         title="청약통장은 언제 만들었나요?"
-        description="은행 앱에서 '주택청약종합저축' 가입일을 확인할 수 있어요. 잘 모르겠다면 비워 두고 넘어가도 돼요."
+        description="은행·토스 앱의 '주택청약종합저축'에서 가입기간이나 가입일을 확인할 수 있어요. 잘 모르겠다면 비워 두고 넘어가도 돼요."
       />
 
-      <FieldLabel htmlFor="subscriptionStartDate">가입한 해와 달</FieldLabel>
-      <input
-        id="subscriptionStartDate"
-        type="month"
-        value={subscriptionStartDate}
-        onChange={(e) => onChange('subscriptionStartDate', e.target.value)}
-        className={inputClass}
-      />
+      <FieldLabel htmlFor="subscriptionPeriodYears">가입기간 (앱에 보이는 그대로)</FieldLabel>
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <input
+            id="subscriptionPeriodYears"
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={60}
+            value={periodYears}
+            onChange={(e) => handlePeriodChange(e.target.value, periodMonths)}
+            className={`${inputClass} pr-10`}
+            placeholder="예: 10"
+            aria-label="가입기간 년"
+          />
+          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">년</span>
+        </div>
+        <div className="relative flex-1">
+          <input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={11}
+            value={periodMonths}
+            onChange={(e) => handlePeriodChange(periodYears, e.target.value)}
+            className={`${inputClass} pr-14`}
+            placeholder="예: 1"
+            aria-label="가입기간 개월"
+          />
+          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500">개월</span>
+        </div>
+      </div>
+
+      <div className="mt-4">
+        <FieldLabel htmlFor="subscriptionStartDate">또는 가입한 해와 달</FieldLabel>
+        <input
+          id="subscriptionStartDate"
+          type="month"
+          value={subscriptionStartDate}
+          onChange={(e) => handleStartDateChange(e.target.value)}
+          className={inputClass}
+        />
+      </div>
       <Note>
-        {subscriptionStartDate ? '가입 기간' : '가입일을 비워 두면 가장 낮은 점수로 계산해요'} →{' '}
+        {elapsedMonths !== null
+          ? `가입 ${formatMonthsAsPeriod(elapsedMonths)}`
+          : '가입기간을 비워 두면 가장 낮은 점수로 계산해요'} →{' '}
         <strong>{subscriptionScore}점</strong>
         <span className="text-blue-600"> / 17점</span>
       </Note>
@@ -697,7 +761,7 @@ function AccountStep({
       </div>
 
       <WhyAsk>
-        <p>청약통장을 오래 가지고 있을수록 점수가 올라가요. 최대 17점이에요.</p>
+        <p>청약통장을 오래 가지고 있을수록 점수가 올라가요. 낸 횟수가 아니라 처음 가입한 날부터의 기간으로 계산하고, 15년 이상이면 최대 17점이에요.</p>
       </WhyAsk>
     </div>
   );

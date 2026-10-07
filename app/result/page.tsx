@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Suspense } from 'react';
 import Disclaimer from '@/components/Disclaimer';
-import { calcHomelessStartDate, calculateTotalScore, calculateSpecialSupply } from '@/lib/calculator';
+import { calcHomelessStartDate, calculateTotalScore, calculateSpecialSupply, formatMonthsAsPeriod, getSubscriptionMonths } from '@/lib/calculator';
 import { useCountUp } from '@/hooks/useCountUp';
 import Tooltip from '@/components/Tooltip';
 import { TERM_MAP } from '@/lib/terms';
@@ -143,7 +143,10 @@ function homelessReason(input: EligibilityInput): string {
 function subscriptionReason(input: EligibilityInput): string {
   if (!input.subscriptionStartDate) return '가입일을 입력하지 않았어요';
   const [y, m] = input.subscriptionStartDate.split('-').map(Number);
-  return y && m ? `${y}년 ${m}월에 가입` : '가입일을 확인하지 못했어요';
+  const months = getSubscriptionMonths(input.subscriptionStartDate);
+  return y && m && months !== null
+    ? `${y}년 ${m}월에 가입 (가입 ${formatMonthsAsPeriod(months)})`
+    : '가입일을 확인하지 못했어요';
 }
 
 const OWNER_NOTE = '집이 없는 세대만 신청할 수 있어요';

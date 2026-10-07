@@ -97,12 +97,39 @@ export function subscriptionScoreFromMonths(months: number): number {
   return Math.min(Math.floor(months / 12) + 2, 17);
 }
 
-export function calculateSubscriptionScore(startDate: string, now: Date = new Date()): number {
-  if (!startDate) return 1;
+/**
+ * 청약통장 가입 시작월(YYYY-MM)부터 기준월까지 경과한 개월 수 (달력 월 기준)
+ * 잘못된 값이면 null
+ */
+export function getSubscriptionMonths(startDate: string, now: Date = new Date()): number | null {
+  if (!startDate) return null;
   const [year, month] = startDate.split('-').map(Number);
-  if (!year || !month) return 1;
+  if (!year || !month) return null;
+  return Math.max((now.getFullYear() - year) * 12 + (now.getMonth() + 1 - month), 0);
+}
 
-  const months = (now.getFullYear() - year) * 12 + (now.getMonth() + 1 - month);
+/**
+ * 가입기간(개월) → 가입 시작월(YYYY-MM). 은행 앱의 "N년 M개월"을 그대로 입력받기 위해 사용
+ */
+export function startDateFromMonths(months: number, now: Date = new Date()): string {
+  const d = new Date(now.getFullYear(), now.getMonth() - Math.max(Math.floor(months), 0), 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/**
+ * 개월 수 → "N년 M개월"
+ */
+export function formatMonthsAsPeriod(months: number): string {
+  const years = Math.floor(months / 12);
+  const remaining = months % 12;
+  if (years === 0) return `${remaining}개월`;
+  if (remaining === 0) return `${years}년`;
+  return `${years}년 ${remaining}개월`;
+}
+
+export function calculateSubscriptionScore(startDate: string, now: Date = new Date()): number {
+  const months = getSubscriptionMonths(startDate, now);
+  if (months === null) return 1;
   return subscriptionScoreFromMonths(months);
 }
 
