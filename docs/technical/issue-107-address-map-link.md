@@ -53,7 +53,7 @@ API 키 없이 쓸 수 있는 웹 검색 URL을 사용합니다. 검색어에 �
 | `components/ui/CopyButton.tsx` | 복사 버튼 (신규, 기존 `CopyAddressButton` 대체) |
 | `app/announcements/page.tsx` | 카드: 주소 복사 + 지도 바로가기 / 바텀시트: 단지 위치 영역 |
 | `lib/announcements.ts` | mock 데이터에 주소 추가 |
-| `tests/maps.test.mjs` | 지도 링크 단위 테스트 (`npm test`, Node 22.18+) |
+| `tests/maps.test.ts` | 지도 링크 단위 테스트 (`npm test`) |
 
 ## 리스크
 

@@ -19,7 +19,7 @@ test('카카오맵 검색 URL에 주소가 인코딩되어 들어간다', () => 
 test('앞뒤 공백은 제거하고, 특수문자(/, #, &)는 인코딩한다', () => {
   const url = getMapSearchUrl('naver', '  경기도 A/B동 1#2&3  ');
   assert.equal(url, `https://map.naver.com/p/search/${encodeURIComponent('경기도 A/B동 1#2&3')}`);
-  assert.ok(!url.slice('https://map.naver.com/p/search/'.length).includes('/'));
+  assert.ok(url && !url.slice('https://map.naver.com/p/search/'.length).includes('/'));
 });
 
 test('빈 주소는 null을 반환한다', () => {
