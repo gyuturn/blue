@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Disclaimer from '@/components/Disclaimer';
 import { BottomSheet } from '@/components/ui/BottomSheet';
@@ -12,6 +12,8 @@ import { useFavorites } from '@/hooks/useFavorites';
 import type { SessionUser } from '@/types/auth';
 import Tooltip from '@/components/Tooltip';
 import { TERM_MAP } from '@/lib/terms';
+import { CopyButton } from '@/components/ui/CopyButton';
+import { getMapSearchUrl } from '@/lib/maps';
 import { readLocalStorage } from '@/hooks/useLocalStorage';
 import { LAST_SCORE_KEY, isEligibilityInput, parseSavedScore, toStoredScoreData } from '@/lib/scoreStorage';
 
@@ -504,7 +506,7 @@ function AnnouncementCard({
 
       {(announcement.pdfUrl || announcement.address) && (
         <div className="border-t border-gray-100 px-4 py-3 space-y-2.5">
-          {announcement.address && <CopyAddressButton address={announcement.address} />}
+          {announcement.address && <AddressActions address={announcement.address} />}
           {announcement.pdfUrl && (
             <a
               href={announcement.pdfUrl}
@@ -535,61 +537,51 @@ function AnnouncementCard({
   );
 }
 
-async function copyText(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    // 비보안 컨텍스트·권한 거부 시 폴백
-    try {
-      const el = document.createElement('textarea');
-      el.value = text;
-      el.readOnly = true;
-      el.style.position = 'fixed';
-      el.style.opacity = '0';
-      document.body.appendChild(el);
-      try {
-        el.focus();
-        el.select();
-        el.setSelectionRange(0, text.length);
-        return document.execCommand('copy');
-      } finally {
-        document.body.removeChild(el);
-      }
-    } catch {
-      return false;
-    }
-  }
-}
+const COPY_ICON = (
+  <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+  </svg>
+);
 
-function CopyAddressButton({ address }: { address: string }) {
-  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => () => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-  }, []);
-
-  const handleCopy = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setState((await copyText(address)) ? 'copied' : 'failed');
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => setState('idle'), 2000);
-  };
+// 주소 복사 + 네이버지도/카카오맵 바로가기 (지도에는 주소가 검색어로 자동 입력된다)
+function AddressActions({ address, size = 'sm' }: { address: string; size?: 'sm' | 'md' }) {
+  const naverMapUrl = getMapSearchUrl('naver', address);
+  const kakaoMapUrl = getMapSearchUrl('kakao', address);
+  const base = `flex items-center justify-center gap-1.5 rounded-xl font-semibold transition-colors ${
+    size === 'md' ? 'py-2.5 text-xs' : 'py-2 text-[11px]'
+  }`;
 
   return (
-    <button
-      type="button"
-      onClick={handleCopy}
-      className="w-full flex items-center justify-center gap-2 text-xs font-semibold text-gray-600 hover:text-gray-800 transition-colors"
-    >
-      <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-      </svg>
-      <span aria-live="polite">
-        {state === 'copied' ? '복사됐어요 ✓' : state === 'failed' ? '복사에 실패했어요' : '주소 복사하기'}
-      </span>
-    </button>
+    <div className="grid grid-cols-3 gap-2">
+      <CopyButton
+        text={address}
+        label="주소 복사"
+        icon={COPY_ICON}
+        className={`${base} border border-gray-200 text-gray-600 hover:bg-gray-50`}
+      />
+      {naverMapUrl && (
+        <a
+          href={naverMapUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className={`${base} bg-[#03C75A] text-white hover:opacity-90`}
+        >
+          네이버지도
+        </a>
+      )}
+      {kakaoMapUrl && (
+        <a
+          href={kakaoMapUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className={`${base} bg-[#FEE500] text-gray-900 hover:opacity-90`}
+        >
+          카카오맵
+        </a>
+      )}
+    </div>
   );
 }
 
@@ -600,6 +592,9 @@ function AnnouncementDetail({ announcement, scoreData }: { announcement: Announc
 
   const dday = getDday(announcement.subscriptionStartDate, announcement.subscriptionEndDate);
   const ddayBadge = getDdayBadgeStyle(dday);
+
+  // 목록 API 주소가 없으면 청약홈 상세의 위치로 대체
+  const address = announcement.address ?? detail?.location;
 
   // 공고가 바뀌면 key로 다시 마운트되므로 로딩 상태 초기화가 필요 없다
   useEffect(() => {
@@ -630,6 +625,15 @@ function AnnouncementDetail({ announcement, scoreData }: { announcement: Announc
         </div>
       </div>
       <p className="text-sm text-gray-500 mb-4">{announcement.builder} · {announcement.region}</p>
+
+      {/* 단지 위치 */}
+      {address && (
+        <div className="bg-gray-50 rounded-xl p-4 mb-4">
+          <SectionLabel>단지 위치</SectionLabel>
+          <p className="text-sm text-gray-800 break-keep mt-2 mb-3">{address}</p>
+          <AddressActions address={address} size="md" />
+        </div>
+      )}
 
       {/* 내 경쟁 분석 + 특별공급 */}
       <div className="space-y-3 mb-4">
@@ -668,7 +672,6 @@ function AnnouncementDetail({ announcement, scoreData }: { announcement: Announc
           {/* 기본 정보 */}
           <div className="bg-gray-50 rounded-xl p-4 space-y-3 mb-4">
             <SectionLabel>기본 정보</SectionLabel>
-            {detail.location && <InfoRow label="위치" value={detail.location} />}
             {detail.totalSupply && <InfoRow label="공급 규모" value={detail.totalSupply} />}
             {detail.constructor && <InfoRow label="시공사" value={detail.constructor} />}
             {detail.operator && <InfoRow label="시행사" value={detail.operator} />}
