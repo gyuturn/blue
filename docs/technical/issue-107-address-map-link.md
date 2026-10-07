@@ -2,7 +2,7 @@
 
 ## 개요
 
-공고 상세 페이지에 "단지 위치" 카드를 추가합니다. 공급위치 주소를 보여주고, 주소 복사와 네이버지도·카카오맵 바로가기를 제공합니다.
+공고 상세(목록 화면의 바텀시트)에 "단지 위치" 영역을 추가하고, 공고 카드의 주소 복사 버튼 옆에 지도 바로가기를 붙입니다. 공급위치 주소를 보여주고, 주소 복사와 네이버지도·카카오맵 바로가기를 제공합니다.
 
 ## 데이터
 
@@ -19,8 +19,9 @@ export interface Announcement {
 address: item.HSSPLY_ADRES?.trim() || undefined,
 ```
 
-- 상세 페이지는 목록에서 저장한 `localStorage.selectedAnnouncement`를 읽습니다. 배포 전에 저장된 데이터에는 `address`가 없을 수 있어서 optional로 둡니다.
-- 주소가 없으면 카드를 숨깁니다.
+- 매핑은 #97에서 이미 추가되었습니다.
+- 바텀시트에서는 `announcement.address`가 없으면 청약홈 상세의 `detail.location`으로 대체합니다.
+- 주소가 없으면 영역을 숨깁니다. 기본 정보의 중복 "위치" 행은 제거합니다.
 
 ## 지도 바로가기
 
@@ -37,21 +38,21 @@ API 키 없이 쓸 수 있는 웹 검색 URL을 사용합니다. 검색어에 �
 
 ## 주소 복사
 
-`components/ui/CopyButton.tsx`(클라이언트 컴포넌트)로 만듭니다.
+#97의 복사 로직을 `lib/clipboard.ts`(`copyText`)와 `components/ui/CopyButton.tsx`로 분리해 카드와 바텀시트가 함께 씁니다.
 
-1. `navigator.clipboard.writeText` 시도 (HTTPS/localhost에서만 동작)
-2. 실패하거나 API가 없으면 숨긴 `textarea` + `document.execCommand('copy')`로 대체
-3. 결과 상태(`idle` / `copied` / `failed`)를 2초간 표시
+1. `navigator.clipboard.writeText` 시도
+2. 실패하면 숨긴 `textarea` + `document.execCommand('copy')`로 대체
+3. 결과(복사됐어요 / 복사에 실패했어요)를 2초간 표시
 
 ## 변경 파일
 
 | 파일 | 변경 |
 |------|------|
-| `types/index.ts` | `Announcement.address` 추가 |
-| `lib/announcements.ts` | `HSSPLY_ADRES` 매핑, mock 데이터에 주소 추가 |
 | `lib/maps.ts` | 지도 링크 생성 함수 (신규) |
-| `components/ui/CopyButton.tsx` | 주소 복사 버튼 (신규) |
-| `app/announcements/[id]/page.tsx` | 단지 위치 카드 |
+| `lib/clipboard.ts` | 복사 로직 분리 (신규) |
+| `components/ui/CopyButton.tsx` | 복사 버튼 (신규, 기존 `CopyAddressButton` 대체) |
+| `app/announcements/page.tsx` | 카드: 주소 복사 + 지도 바로가기 / 바텀시트: 단지 위치 영역 |
+| `lib/announcements.ts` | mock 데이터에 주소 추가 |
 | `tests/maps.test.mjs` | 지도 링크 단위 테스트 (`npm test`, Node 22.18+) |
 
 ## 리스크

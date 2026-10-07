@@ -1,60 +1,38 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-
-type CopyState = 'idle' | 'copied' | 'failed';
+import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import { copyText } from '@/lib/clipboard';
 
 interface CopyButtonProps {
   text: string;
-  label?: string;
+  label: string;
   className?: string;
+  icon?: ReactNode;
 }
 
-async function copyToClipboard(text: string): Promise<boolean> {
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-  } catch {
-    // 아래 fallback으로 재시도
-  }
+// 클릭 시 text를 복사하고 2초간 결과를 표시한다. 카드 안에서도 쓰이므로 클릭 이벤트 전파를 막는다.
+export function CopyButton({ text, label, className = '', icon }: CopyButtonProps) {
+  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  try {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.setAttribute('readonly', '');
-    textarea.style.position = 'fixed';
-    textarea.style.opacity = '0';
-    document.body.appendChild(textarea);
-    textarea.select();
-    const ok = document.execCommand('copy');
-    document.body.removeChild(textarea);
-    return ok;
-  } catch {
-    return false;
-  }
-}
+  useEffect(() => () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+  }, []);
 
-export function CopyButton({ text, label = '복사', className = '' }: CopyButtonProps) {
-  const [state, setState] = useState<CopyState>('idle');
-
-  useEffect(() => {
-    if (state === 'idle') return;
-    const timer = setTimeout(() => setState('idle'), 2000);
-    return () => clearTimeout(timer);
-  }, [state]);
-
-  const handleClick = async () => {
-    const ok = await copyToClipboard(text);
-    setState(ok ? 'copied' : 'failed');
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setState((await copyText(text)) ? 'copied' : 'failed');
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setState('idle'), 2000);
   };
 
-  const display = state === 'copied' ? '복사됨 ✓' : state === 'failed' ? '복사 실패' : label;
-
   return (
-    <button type="button" onClick={handleClick} className={className} aria-live="polite">
-      {display}
+    <button type="button" onClick={handleCopy} className={className}>
+      {icon}
+      <span aria-live="polite">
+        {state === 'copied' ? '복사됐어요 ✓' : state === 'failed' ? '복사에 실패했어요' : label}
+      </span>
     </button>
   );
 }

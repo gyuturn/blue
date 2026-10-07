@@ -1,4 +1,11 @@
-import type { Announcement, EligibilityInput, HouseType, SpecialSupplyEligibility, SubscriptionStatus } from '@/types';
+import type {
+  Announcement,
+  EligibilityInput,
+  SpecialSupplyCounts,
+  SpecialSupplyEligibility,
+  StoredScoreData,
+  SubscriptionStatus,
+} from '@/types';
 
 // API 응답 날짜는 이미 YYYY-MM-DD 형식으로 반환됨
 function formatDate(date: string): string {
@@ -85,8 +92,6 @@ export async function fetchAnnouncementsFromAPI(region?: string): Promise<Announ
     return [];
   }
 
-  console.log('[API] KEY exists:', !!apiKey, 'length:', apiKey?.length);
-
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 5000);
 
@@ -94,22 +99,26 @@ export async function fetchAnnouncementsFromAPI(region?: string): Promise<Announ
     const baseUrl =
       'https://api.odcloud.kr/api/ApplyhomeInfoDetailSvc/v1/getAPTLttotPblancDetail';
 
-    // serviceKey는 URL 인코딩된 원본 값을 그대로 사용 (URLSearchParams 이중 인코딩 방지)
-    let queryString = `page=1&perPage=20&returnType=JSON&serviceKey=${apiKey}`;
+    // serviceKey는 공공데이터포털 인코딩 키를 URL에 직접 삽입 (URLSearchParams 이중인코딩 방지)
+    const queryParams = new URLSearchParams({
+      page: '1',
+      perPage: '20',
+      returnType: 'JSON',
+    });
 
     if (region) {
       const resolvedRegion = resolveRegionParam(region);
-      queryString += `&cond[SUBSCRPT_AREA_CODE_NM::EQ]=${encodeURIComponent(resolvedRegion)}`;
+      queryParams.append('cond[SUBSCRPT_AREA_CODE_NM::EQ]', resolvedRegion);
     }
 
-    const response = await fetch(`${baseUrl}?${queryString}`, {
+    const url = `${baseUrl}?serviceKey=${apiKey}&${queryParams.toString()}`;
+
+    const response = await fetch(url, {
       signal: controller.signal,
-      cache: 'no-store',
+      next: { revalidate: 3600 },
     });
 
     clearTimeout(timeoutId);
-
-    console.log('[API] Response status:', response.status);
 
     if (response.status === 429) {
       console.error('[API] Rate limit exceeded');
@@ -117,22 +126,22 @@ export async function fetchAnnouncementsFromAPI(region?: string): Promise<Announ
     }
 
     if (!response.ok) {
-      const text = await response.text();
-      console.error(`[API] Error: ${response.status} ${response.statusText}`, text.slice(0, 200));
+      console.error(`[API] Error: ${response.status} ${response.statusText}`);
       return [];
     }
 
     const json = await response.json();
-    console.log('[API] Response data count:', json?.data?.length ?? 0, 'totalCount:', json?.totalCount);
     const items: Record<string, string>[] = json?.data ?? [];
 
-    return items.map((item, idx): Announcement => {
+    const announcements = items.map((item, idx): Announcement => {
       const startDate = formatDate(item.RCEPT_BGNDE ?? '');
       const endDate = formatDate(item.RCEPT_ENDDE ?? '');
       const status = getSubscriptionStatus(startDate, endDate);
 
       return {
-        id: item.HOUSE_MANAGE_NO ?? `api-${idx}`,
+        // API가 숫자로 내려줄 수 있으므로 문자열로 고정
+        id: String(item.HOUSE_MANAGE_NO ?? `api-${idx}`),
+        pblancNo: String(item.PBLANC_NO ?? item.HOUSE_MANAGE_NO ?? `api-${idx}`),
         complexName: item.HOUSE_NM ?? '단지명 없음',
         builder: item.BSNS_MBY_NM ?? '건설사 없음',
         region: item.SUBSCRPT_AREA_CODE_NM ?? '',
@@ -144,13 +153,12 @@ export async function fetchAnnouncementsFromAPI(region?: string): Promise<Announ
         pdfUrl: item.PBLANC_URL,
         totalHouseholds: item.TOT_SUPLY_HSHLDCO ? Number(item.TOT_SUPLY_HSHLDCO) : undefined,
         status: status === '일정미정' ? undefined : status,
-        specialSupplyTypes: {
-          newlyWed: Number(item.NWWDS_SUPLY_HSHLDCO ?? 0) > 0,
-          firstHome: Number(item.LTTOT_TOP_SUPLY_HSHLDCO ?? 0) > 0,
-          multiChild: Number(item.MNYCH_HSHLD_SUPLY_HSHLDCO ?? 0) > 0,
-        },
+        supplyKind: item.HOUSE_DTL_SECD_NM === '국민' ? '국민' : item.HOUSE_DTL_SECD_NM === '민영' ? '민영' : undefined,
+        regulation: parseRegulation(item),
       };
     });
+
+    return await withSpecialSupplyCounts(apiKey, announcements);
   } catch (error) {
     clearTimeout(timeoutId);
     if (error instanceof Error && error.name === 'AbortError') {
@@ -159,6 +167,83 @@ export async function fetchAnnouncementsFromAPI(region?: string): Promise<Announ
     }
     console.error('[API] Unexpected error:', error);
     return [];
+  }
+}
+
+// Y/N 이외의 값(필드 누락 포함)은 '모름'으로 처리 — 잘못된 '비규제지역' 안내를 막기 위함
+function parseYn(value: string | undefined): boolean | undefined {
+  if (value === 'Y') return true;
+  if (value === 'N') return false;
+  return undefined;
+}
+
+function parseRegulation(item: Record<string, string>): Announcement['regulation'] {
+  const speculationOverheated = parseYn(item.SPECLT_RDN_EARTH_AT);
+  const adjustedArea = parseYn(item.MDAT_TRGET_AREA_SECD);
+  if (speculationOverheated === undefined || adjustedArea === undefined) return undefined;
+  return { speculationOverheated, adjustedArea, priceCap: parseYn(item.PARCPRC_ULS_AT) ?? false };
+}
+
+// 특별공급 유형별 세대수는 주택형별 API에만 있으므로 공고별로 병렬 조회해 합산
+// 부가 정보이므로 어떤 이유로 실패해도 공고 목록은 그대로 반환한다
+async function withSpecialSupplyCounts(apiKey: string, announcements: Announcement[]): Promise<Announcement[]> {
+  try {
+    const counts = await Promise.all(
+      announcements.map((a) =>
+        // 마감 공고는 기본 숨김이라 API 호출량 절약을 위해 생략
+        a.status === '마감' || a.id.startsWith('api-') ? null : fetchSpecialSupplyCounts(apiKey, a.id),
+      ),
+    );
+    return announcements.map((a, i) => {
+      const c = counts[i];
+      return c ? { ...a, specialSupplyCounts: c } : a;
+    });
+  } catch (error) {
+    console.error('[API] special supply enrichment failed:', error);
+    return announcements;
+  }
+}
+
+// 주택형별 공급 API에서 특별공급 유형별 세대수 합산 (실패 시 null → 화면에서 숨김)
+async function fetchSpecialSupplyCounts(apiKey: string, houseManageNo: string): Promise<SpecialSupplyCounts | null> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+  try {
+    const baseUrl = 'https://api.odcloud.kr/api/ApplyhomeInfoDetailSvc/v1/getAPTLttotPblancMdl';
+    const queryParams = new URLSearchParams({ page: '1', perPage: '100', returnType: 'JSON' });
+    queryParams.append('cond[HOUSE_MANAGE_NO::EQ]', houseManageNo);
+
+    const response = await fetch(`${baseUrl}?serviceKey=${apiKey}&${queryParams.toString()}`, {
+      signal: controller.signal,
+      // 특공 세대수는 공고 후 바뀌지 않으므로 길게 캐시 (API 호출량 절약)
+      next: { revalidate: 21600 },
+    });
+    clearTimeout(timeoutId);
+    if (!response.ok) {
+      console.error(`[API] special supply error: ${response.status} (${houseManageNo})`);
+      return null;
+    }
+
+    const json = await response.json();
+    const items: Record<string, string>[] = json?.data ?? [];
+    if (items.length === 0) return null;
+
+    const sum = (key: string) => items.reduce((acc, it) => acc + (Number(it[key]) || 0), 0);
+    return {
+      newlyWed: sum('NWWDS_HSHLDCO'),
+      firstHome: sum('LFE_FRST_HSHLDCO'),
+      multiChild: sum('MNYCH_HSHLDCO'),
+      newborn: sum('NWBB_HSHLDCO'),
+      youth: sum('YGMN_HSHLDCO'),
+      oldParents: sum('OLD_PARNTS_SUPORT_HSHLDCO'),
+      institution: sum('INSTT_RECOMEND_HSHLDCO'),
+      other: sum('TRANSR_INSTT_ENFSN_HSHLDCO') + sum('ETC_HSHLDCO'),
+      generalTotal: sum('SUPLY_HSHLDCO'),
+    };
+  } catch {
+    clearTimeout(timeoutId);
+    return null;
   }
 }
 
@@ -173,17 +258,6 @@ export function getDdayBadgeStyle(dday: string): { label: string; className: str
   return { label: dday, className: 'bg-blue-100 text-blue-600' };
 }
 
-// 등급 기반 추천 라벨
-export function getScoreTierLabel(tier: 'S' | 'A' | 'B' | 'C'): { text: string; style: string } {
-  if (tier === 'S' || tier === 'A') {
-    return { text: '경쟁력 높음', style: 'bg-green-100 text-green-700' };
-  }
-  if (tier === 'B') {
-    return { text: '평균 수준', style: 'bg-yellow-100 text-yellow-700' };
-  }
-  return { text: '경쟁 어려울 수 있음', style: 'bg-gray-100 text-gray-600' };
-}
-
 // 일반공급 자격 여부
 export function getGeneralSupplyLabel(input: EligibilityInput): { eligible: boolean; text: string } {
   if (input.isHomeless && input.subscriptionPaymentCount >= 1) {
@@ -192,107 +266,192 @@ export function getGeneralSupplyLabel(input: EligibilityInput): { eligible: bool
   return { eligible: false, text: '일반공급 자격 미충족' };
 }
 
-// 특별공급 매칭 라벨 (사용자 자격 × 공고 제공 유형 교집합)
-export function getSpecialSupplyLabels(
-  specialSupply: SpecialSupplyEligibility,
-  announcementTypes?: { newlyWed: boolean; firstHome: boolean; multiChild: boolean },
-): string[] {
-  const labels: string[] = [];
-  const newlyWed = announcementTypes ? announcementTypes.newlyWed && specialSupply.newlyWed : specialSupply.newlyWed;
-  const firstHome = announcementTypes ? announcementTypes.firstHome && specialSupply.firstHome : specialSupply.firstHome;
-  const multiChild = announcementTypes ? announcementTypes.multiChild && specialSupply.multiChild : specialSupply.multiChild;
-  if (newlyWed) labels.push('신혼부부 특공 가능');
-  if (firstHome) labels.push('생애최초 특공 가능');
-  if (multiChild) labels.push('다자녀 특공 가능');
-  return labels;
+// 공고가 제공하는 특별공급 유형 목록 (세대수 + 내 자격 매칭 여부)
+export interface SpecialSupplyBadge {
+  key: keyof Omit<SpecialSupplyCounts, 'generalTotal'>;
+  name: string;
+  count: number;
+  matched: boolean; // 내 입력 정보로 자격이 있는 유형
 }
 
-// 주택형 파싱: "059.9500" → "59.95㎡"
-export function parseHouseTy(raw: string): string {
-  if (!raw) return '';
-  const num = parseFloat(raw);
-  if (isNaN(num)) return raw;
-  // 소수점 불필요한 0 제거 후 ㎡ 단위 추가
-  const formatted = num % 1 === 0 ? num.toFixed(0) : String(parseFloat(num.toFixed(4)));
-  return `${formatted}㎡`;
+const SPECIAL_SUPPLY_NAMES: Record<SpecialSupplyBadge['key'], string> = {
+  newlyWed: '신혼부부',
+  firstHome: '생애최초',
+  multiChild: '다자녀',
+  newborn: '신생아',
+  youth: '청년',
+  oldParents: '노부모부양',
+  institution: '기관추천',
+  other: '기타',
+};
+
+export function getSpecialSupplyBadges(
+  announcement: Announcement,
+  specialSupply?: SpecialSupplyEligibility,
+): SpecialSupplyBadge[] {
+  const counts = announcement.specialSupplyCounts;
+  if (!counts) return [];
+  return (Object.keys(SPECIAL_SUPPLY_NAMES) as SpecialSupplyBadge['key'][])
+    .filter((key) => counts[key] > 0)
+    .map((key) => ({
+      key,
+      name: SPECIAL_SUPPLY_NAMES[key],
+      count: counts[key],
+      matched:
+        !!specialSupply &&
+        (key === 'newlyWed' || key === 'firstHome' || key === 'multiChild') &&
+        specialSupply[key],
+    }));
 }
 
-// 분양가 파싱: "2026000187(02)" → { value: 202600, display: "20억 2,600만원" }
-export function parseLttotTopAmount(raw: string): { value: number | null; display: string } {
-  if (!raw || raw.trim() === '') return { value: null, display: '미공개' };
+// 경쟁 분석: 라벨 + "왜 그런지" 이유 목록
+export type CompetitionLevel = 'good' | 'fair' | 'hard' | 'notApplicable';
 
-  // 숫자만 추출 (괄호 및 부가코드 제거)
-  const numericStr = raw.replace(/[^0-9]/g, '');
-  if (!numericStr) return { value: null, display: '미공개' };
+export interface CompetitionReason {
+  tone: 'plus' | 'minus' | 'info';
+  text: string;
+}
 
-  const wonAmount = Number(numericStr);
-  if (isNaN(wonAmount) || wonAmount <= 0) return { value: null, display: '미공개' };
+export interface CompetitionAnalysis {
+  level: CompetitionLevel;
+  label: string;
+  style: string;
+  reasons: CompetitionReason[];
+}
 
-  // 원 → 만원
-  const manwon = Math.round(wonAmount / 10000);
+const LEVEL_META: Record<CompetitionLevel, { label: string; style: string }> = {
+  good: { label: '경쟁력 높음', style: 'bg-green-100 text-green-700' },
+  fair: { label: '도전해볼 만함', style: 'bg-yellow-100 text-yellow-700' },
+  hard: { label: '경쟁 어려울 수 있음', style: 'bg-gray-100 text-gray-600' },
+  notApplicable: { label: '신청 대상 아님', style: 'bg-red-50 text-red-500' },
+};
 
-  let display: string;
-  if (manwon >= 10000) {
-    const eok = Math.floor(manwon / 10000);
-    const rem = manwon % 10000;
-    if (rem === 0) {
-      display = `${eok.toLocaleString()}억원`;
-    } else {
-      display = `${eok.toLocaleString()}억 ${rem.toLocaleString()}만원`;
+const TIER_DIFFICULTY: Record<StoredScoreData['result']['tier'], number> = { S: 0, A: 1, B: 2, C: 3 };
+
+function levelFromDifficulty(d: number): CompetitionLevel {
+  if (d <= 1) return 'good';
+  if (d === 2) return 'fair';
+  return 'hard';
+}
+
+function buildAnalysis(level: CompetitionLevel, reasons: CompetitionReason[], label?: string): CompetitionAnalysis {
+  return { level, label: label ?? LEVEL_META[level].label, style: LEVEL_META[level].style, reasons };
+}
+
+function isNewlyWedTown(a: Announcement): boolean {
+  return a.houseType.includes('신혼희망');
+}
+
+export function getCompetitionAnalysis(
+  announcement: Announcement,
+  scoreData: StoredScoreData,
+): CompetitionAnalysis {
+  const { input, result, specialSupply } = scoreData;
+  const reasons: CompetitionReason[] = [];
+
+  // 내가 신청할 수 있는 특별공급 (가점과 별개로 뽑으므로 플러스 요인)
+  const matchedSpecial = getSpecialSupplyBadges(announcement, specialSupply).filter((b) => b.matched);
+  const specialReasons: CompetitionReason[] = matchedSpecial.map((b) => ({
+    tone: 'plus',
+    text: `${b.name} 특별공급 ${b.count.toLocaleString()}세대 — 내 조건에 해당해요 (소득·자산 기준 충족 시 신청 가능, 가점과 별개로 뽑아요)`,
+  }));
+
+  // 1) 신혼희망타운: 신혼부부·예비신혼·한부모만, 청약 가점 미사용
+  if (isNewlyWedTown(announcement)) {
+    reasons.push({ tone: 'info', text: '신혼희망타운은 신혼부부·예비신혼부부·한부모 가정만 신청할 수 있어요' });
+    reasons.push({ tone: 'info', text: '청약 가점(84점)이 아니라 소득·거주기간·납입횟수 등 별도 배점으로 뽑아요' });
+    if (!specialSupply.newlyWed) {
+      reasons.push({
+        tone: 'minus',
+        text: input.isHomeless
+          ? '입력한 정보로는 신혼부부 요건(혼인 7년 이내)에 해당하지 않아요'
+          : '신혼희망타운은 무주택 세대만 신청할 수 있어요',
+      });
+      return buildAnalysis('notApplicable', reasons, '신혼부부 전용 공고');
     }
-  } else {
-    display = `${manwon.toLocaleString()}만원`;
+    reasons.push({ tone: 'plus', text: '신혼부부 요건에 해당해요 — 가점이 낮아도 도전할 수 있어요' });
+    return buildAnalysis('fair', reasons);
   }
 
-  return { value: manwon, display };
+  // 일반공급 자격 (무주택 + 청약통장)
+  const generalEligible = getGeneralSupplyLabel(input).eligible;
+  if (!generalEligible) {
+    reasons.push({ tone: 'minus', text: '무주택·청약통장 요건을 채우지 못해 일반공급 신청이 어려워요' });
+    if (matchedSpecial.length === 0) return buildAnalysis('notApplicable', reasons);
+  }
+
+  // 2) 국민주택(공공분양): 가점이 아니라 납입 횟수·저축 총액 순차제
+  if (announcement.supplyKind === '국민') {
+    reasons.push({ tone: 'info', text: '공공분양 일반공급은 가점이 아니라 청약통장 납입 횟수·저축 총액 순으로 뽑아요' });
+    const count = input.subscriptionPaymentCount;
+    if (!generalEligible) return buildAnalysis('fair', [...reasons, ...specialReasons]);
+    let d: number;
+    if (count >= 120) {
+      d = 1;
+      reasons.push({ tone: 'plus', text: `내 납입 횟수 ${count}회 — 순차제에서 유리한 편이에요` });
+    } else if (count >= 60) {
+      d = 2;
+      reasons.push({ tone: 'info', text: `내 납입 횟수 ${count}회 — 인기 단지는 이보다 많은 경우가 많아요` });
+    } else {
+      d = 3;
+      reasons.push({ tone: 'minus', text: `내 납입 횟수 ${count}회 — 납입 횟수가 적으면 순차제에서 불리해요` });
+    }
+    if (matchedSpecial.length > 0 && d === 3) d = 2;
+    return buildAnalysis(levelFromDifficulty(d), [...reasons, ...specialReasons]);
+  }
+
+  // 3) 민영주택: 가점제 + 지역 규제·분양가상한제 반영
+  let d = TIER_DIFFICULTY[result.tier];
+  const tierText =
+    result.tier === 'S' || result.tier === 'A'
+      ? '가점제에서 유리해요'
+      : result.tier === 'B'
+      ? '가점제에서 평균 수준이에요'
+      : '가점제에서는 불리해요';
+  reasons.push({
+    tone: result.tier === 'C' ? 'minus' : result.tier === 'B' ? 'info' : 'plus',
+    text: `내 가점 ${result.totalScore}점(${result.tier}등급) — ${tierText}`,
+  });
+
+  const reg = announcement.regulation;
+  if (reg) {
+    if (reg.speculationOverheated || reg.adjustedArea) {
+      d += 1;
+      const name = reg.speculationOverheated ? '투기과열지구' : '조정대상지역';
+      reasons.push({ tone: 'minus', text: `${name} — 가점제 비중이 높아 가점이 중요해요` });
+    } else if (result.tier === 'B' || result.tier === 'C') {
+      d -= 1;
+      reasons.push({ tone: 'plus', text: '비규제지역 — 추첨제 물량이 있어 가점이 낮아도 당첨 기회가 있어요' });
+    }
+    if (reg.priceCap) {
+      d += 1;
+      reasons.push({ tone: 'minus', text: '분양가상한제 적용 — 시세보다 저렴해 신청자가 몰리는 편이에요' });
+    }
+  }
+
+  if (!generalEligible) return buildAnalysis('fair', [...reasons, ...specialReasons]);
+  if (matchedSpecial.length > 0 && d >= 3) d = 2;
+
+  return buildAnalysis(levelFromDifficulty(d), [...reasons, ...specialReasons]);
 }
 
-// 주택형별 공급 정보 API 호출 (서버에서만 사용)
-export async function fetchHouseTypesFromAPI(houseManageNo: string): Promise<HouseType[]> {
-  const apiKey = process.env.PUBLIC_DATA_API_KEY;
-  if (!apiKey) return [];
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-  try {
-    const baseUrl =
-      'https://api.odcloud.kr/api/ApplyhomeInfoDetailSvc/v1/getAPTLttotPblancMdl';
-    const queryString = `page=1&perPage=50&returnType=JSON&serviceKey=${apiKey}&cond[HOUSE_MANAGE_NO::EQ]=${encodeURIComponent(houseManageNo)}`;
-
-    const response = await fetch(`${baseUrl}?${queryString}`, {
-      signal: controller.signal,
-      cache: 'no-store',
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      console.error(`[API] house-types error: ${response.status}`);
-      return [];
-    }
-
-    const json = await response.json();
-    const items: Record<string, string>[] = json?.data ?? [];
-
-    return items.map((item): HouseType => {
-      const parsed = parseLttotTopAmount(item.LTTOT_TOP_AMOUNT ?? '');
-      return {
-        houseTypeName: parseHouseTy(item.HOUSE_TY ?? ''),
-        supplyCount: Number(item.SUPLY_HSHLDCO ?? 0),
-        price: parsed.value,
-        priceDisplay: parsed.display,
-      };
-    });
-  } catch (error) {
-    clearTimeout(timeoutId);
-    if (error instanceof Error && error.name === 'AbortError') {
-      console.warn('[API] house-types timeout');
-    } else {
-      console.error('[API] house-types unexpected error:', error);
-    }
-    return [];
-  }
+// Mock 특공 세대수: 지정한 유형 + 노부모부양·기관추천 일부, 나머지는 일반공급
+function mockCounts(
+  total: number,
+  partial: Pick<SpecialSupplyCounts, 'newlyWed' | 'firstHome' | 'multiChild'>,
+): SpecialSupplyCounts {
+  const oldParents = Math.round(total * 0.03);
+  const institution = Math.round(total * 0.1);
+  const special = partial.newlyWed + partial.firstHome + partial.multiChild + oldParents + institution;
+  return {
+    ...partial,
+    newborn: 0,
+    youth: 0,
+    oldParents,
+    institution,
+    other: 0,
+    generalTotal: total - special,
+  };
 }
 
 // Mock 데이터
@@ -309,7 +468,9 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     houseType: '민영주택',
     pdfUrl: 'https://www.applyhome.co.kr',
     totalHouseholds: 350,
-    specialSupplyTypes: { newlyWed: true, firstHome: true, multiChild: false },
+    specialSupplyCounts: mockCounts(350, { newlyWed: 63, firstHome: 35, multiChild: 0 }),
+    supplyKind: '민영',
+    regulation: { speculationOverheated: true, adjustedArea: true, priceCap: true },
   },
   {
     id: 'mock-002',
@@ -323,7 +484,9 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     houseType: '민영주택',
     pdfUrl: 'https://www.applyhome.co.kr',
     totalHouseholds: 520,
-    specialSupplyTypes: { newlyWed: true, firstHome: false, multiChild: true },
+    specialSupplyCounts: mockCounts(520, { newlyWed: 94, firstHome: 0, multiChild: 42 }),
+    supplyKind: '민영',
+    regulation: { speculationOverheated: false, adjustedArea: false, priceCap: false },
   },
   {
     id: 'mock-003',
@@ -337,7 +500,9 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     houseType: '민영주택',
     pdfUrl: 'https://www.applyhome.co.kr',
     totalHouseholds: 280,
-    specialSupplyTypes: { newlyWed: false, firstHome: true, multiChild: false },
+    specialSupplyCounts: mockCounts(280, { newlyWed: 0, firstHome: 28, multiChild: 0 }),
+    supplyKind: '민영',
+    regulation: { speculationOverheated: false, adjustedArea: false, priceCap: false },
   },
   {
     id: 'mock-004',
@@ -351,7 +516,9 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     houseType: '민영주택',
     pdfUrl: 'https://www.applyhome.co.kr',
     totalHouseholds: 410,
-    specialSupplyTypes: { newlyWed: true, firstHome: true, multiChild: true },
+    specialSupplyCounts: mockCounts(410, { newlyWed: 74, firstHome: 41, multiChild: 33 }),
+    supplyKind: '민영',
+    regulation: { speculationOverheated: false, adjustedArea: false, priceCap: false },
   },
   {
     id: 'mock-005',
@@ -365,7 +532,9 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     houseType: '민영주택',
     pdfUrl: 'https://www.applyhome.co.kr',
     totalHouseholds: 195,
-    specialSupplyTypes: { newlyWed: false, firstHome: false, multiChild: false },
+    specialSupplyCounts: mockCounts(195, { newlyWed: 0, firstHome: 0, multiChild: 0 }),
+    supplyKind: '민영',
+    regulation: { speculationOverheated: false, adjustedArea: false, priceCap: false },
   },
   {
     id: 'mock-006',
@@ -378,7 +547,9 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     houseType: '민영주택',
     pdfUrl: 'https://www.applyhome.co.kr',
     totalHouseholds: 320,
-    specialSupplyTypes: { newlyWed: true, firstHome: false, multiChild: false },
+    specialSupplyCounts: mockCounts(320, { newlyWed: 58, firstHome: 0, multiChild: 0 }),
+    supplyKind: '민영',
+    regulation: { speculationOverheated: false, adjustedArea: false, priceCap: false },
   },
   {
     id: 'mock-007',
@@ -391,7 +562,9 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     houseType: '공공임대',
     pdfUrl: 'https://www.applyhome.co.kr',
     totalHouseholds: 150,
-    specialSupplyTypes: { newlyWed: true, firstHome: true, multiChild: true },
+    specialSupplyCounts: mockCounts(150, { newlyWed: 27, firstHome: 15, multiChild: 12 }),
+    supplyKind: '국민',
+    regulation: { speculationOverheated: false, adjustedArea: false, priceCap: false },
   },
   {
     id: 'mock-008',
@@ -404,6 +577,8 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     houseType: '민영주택',
     pdfUrl: 'https://www.applyhome.co.kr',
     totalHouseholds: 240,
-    specialSupplyTypes: { newlyWed: false, firstHome: true, multiChild: false },
+    specialSupplyCounts: mockCounts(240, { newlyWed: 0, firstHome: 24, multiChild: 0 }),
+    supplyKind: '민영',
+    regulation: { speculationOverheated: false, adjustedArea: false, priceCap: false },
   },
 ];

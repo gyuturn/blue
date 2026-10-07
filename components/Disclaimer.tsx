@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export default function Disclaimer() {
   return (
     <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-800">
@@ -21,6 +23,17 @@ export default function Disclaimer() {
         ) 및 모집공고문을 직접 확인하시기 바랍니다. 본 서비스의 정보를 기반으로
         한 투자·청약 결정에 대한 책임은 이용자 본인에게 있습니다.
       </p>
+      <p className="mt-2 text-yellow-700">
+        청약 공고 데이터 출처: 한국부동산원 공공데이터포털
+      </p>
+      <div className="mt-2 flex gap-3">
+        <Link href="/privacy" className="underline hover:text-yellow-900">
+          개인정보 처리방침
+        </Link>
+        <Link href="/terms" className="underline hover:text-yellow-900">
+          이용약관
+        </Link>
+      </div>
     </div>
   );
 }

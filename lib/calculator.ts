@@ -1,14 +1,73 @@
 import type { EligibilityInput, ScoreResult, SpecialSupplyEligibility } from '@/types';
 
 /**
- * 무주택 기간 점수 계산
- * 1년 미만: 2점, 1년~1년 미만: 2점, 최대 32점 (16년 이상)
- * 기준: 1년 = 2점, 2점씩 증가, 최대 16년 이상 = 32점
+ * 무주택기간 산정 시작일 계산 (주택공급에관한규칙)
+ * - 만 30세 미만 미혼: null (산정 불가)
+ * - 만 30세 이상 미혼: 만 30세 생일
+ * - 기혼 + 만 30세 미만: 혼인신고일
+ * - 기혼 + 만 30세 이상: 만 30세 생일 vs 혼인신고일 중 빠른 날
+ */
+export function calcHomelessStartDate(
+  birthDate: string,
+  isMarried: boolean,
+  marriageDate: string,
+): Date | null {
+  if (!birthDate) return null;
+
+  const [birthYear, birthMonth] = birthDate.split('-').map(Number);
+  if (!birthYear || !birthMonth) return null;
+
+  const thirtiethBirthday = new Date(birthYear + 30, birthMonth - 1, 1);
+  const now = new Date();
+
+  if (!isMarried) {
+    // 미혼: 만 30세 미만이면 산정 불가
+    if (now < thirtiethBirthday) return null;
+    return thirtiethBirthday;
+  }
+
+  // 기혼: 혼인신고일 파싱
+  const marriageStart = (() => {
+    if (!marriageDate) return null;
+    const [y, m] = marriageDate.split('-').map(Number);
+    if (!y || !m) return null;
+    return new Date(y, m - 1, 1);
+  })();
+
+  if (!marriageStart) return null;
+
+  // 만 30세 이전에 결혼: 혼인신고일부터
+  if (marriageStart < thirtiethBirthday) return marriageStart;
+
+  // 만 30세 이후에 결혼: 만 30세 생일부터 (더 빠름)
+  return thirtiethBirthday;
+}
+
+/**
+ * 정책 기준으로 무주택기간(년) 계산
+ */
+export function calcHomelessYearsFromPolicy(
+  birthDate: string,
+  isMarried: boolean,
+  marriageDate: string,
+): number {
+  const startDate = calcHomelessStartDate(birthDate, isMarried, marriageDate);
+  if (!startDate) return 0;
+
+  // 입력이 월 단위이므로 개월 수로 계산해 기념일 경계에서 소수점 오차가 나지 않게 한다
+  const now = new Date();
+  const months =
+    (now.getFullYear() - startDate.getFullYear()) * 12 + (now.getMonth() - startDate.getMonth());
+  return Math.max(0, months / 12);
+}
+
+/**
+ * 무주택 기간 점수 (주택공급에 관한 규칙 별표1)
+ * 1년 미만 2점, 1년 이상~2년 미만 4점, … 1년마다 2점씩, 15년 이상 32점
  */
 export function calculateHomelessScore(years: number): number {
-  if (years <= 0) return 2; // 1년 미만도 최소 2점
-  const score = Math.min(Math.floor(years) * 2, 32);
-  return Math.max(score, 2);
+  const fullYears = Math.floor(Math.max(years, 0));
+  return Math.min((fullYears + 1) * 2, 32);
 }
 
 /**
@@ -29,22 +88,22 @@ export function calculateDependentsScore(count: number): number {
 }
 
 /**
- * 청약통장 가입기간 점수 계산
- * 1년 = 2점, 최대 17점 (8년 이상 = 17점)
+ * 입주자저축(청약통장) 가입기간 점수 (주택공급에 관한 규칙 별표1)
+ * 6개월 미만 1점, 6개월 이상~1년 미만 2점, 1년 이상~2년 미만 3점, … 1년마다 1점씩, 15년 이상 17점
  */
-export function calculateSubscriptionScore(startDate: string): number {
+export function subscriptionScoreFromMonths(months: number): number {
+  if (months < 6) return 1;
+  if (months < 12) return 2;
+  return Math.min(Math.floor(months / 12) + 2, 17);
+}
+
+export function calculateSubscriptionScore(startDate: string, now: Date = new Date()): number {
   if (!startDate) return 1;
   const [year, month] = startDate.split('-').map(Number);
   if (!year || !month) return 1;
 
-  const now = new Date();
-  const start = new Date(year, month - 1, 1);
-  const diffMs = now.getTime() - start.getTime();
-  const diffYears = diffMs / (1000 * 60 * 60 * 24 * 365.25);
-
-  if (diffYears < 1) return 1;
-  const score = Math.min(Math.floor(diffYears) * 2 + 1, 17);
-  return score;
+  const months = (now.getFullYear() - year) * 12 + (now.getMonth() + 1 - month);
+  return subscriptionScoreFromMonths(months);
 }
 
 /**
@@ -52,9 +111,14 @@ export function calculateSubscriptionScore(startDate: string): number {
  * 총점 = 무주택(0~32) + 부양가족(0~35) + 청약통장(0~17) = 0~84점
  */
 export function calculateTotalScore(input: EligibilityInput): ScoreResult {
-  const homelessScore = input.isHomeless
-    ? calculateHomelessScore(input.homelessYears)
-    : 0;
+  let homelessScore = 0;
+  if (input.isHomeless) {
+    // 만 30세 미만 미혼은 산정 불가 → 0점 (정책: 주택공급에관한규칙)
+    const startDate = calcHomelessStartDate(input.birthDate, input.isMarried, input.marriageDate);
+    if (startDate !== null) {
+      homelessScore = calculateHomelessScore(input.homelessYears);
+    }
+  }
   const dependentsScore = calculateDependentsScore(input.dependentsCount);
   const subscriptionScore = calculateSubscriptionScore(input.subscriptionStartDate);
   const totalScore = homelessScore + dependentsScore + subscriptionScore;
@@ -102,76 +166,24 @@ export function calcMarriageYears(marriageDate: string): number {
 }
 
 /**
- * 무주택 기간 다음 마일스톤
- * 다음 연도 도달 시 얻는 추가 점수와 필요 연수 반환
- */
-export function getHomelessNextMilestone(
-  years: number,
-): { nextScore: number; gainScore: number; neededYears: number } | null {
-  const currentScore = calculateHomelessScore(years);
-  if (currentScore >= 32) return null;
-  const nextYears = Math.floor(years) + 1;
-  const nextScore = calculateHomelessScore(nextYears);
-  return {
-    nextScore,
-    gainScore: nextScore - currentScore,
-    neededYears: nextYears - years,
-  };
-}
-
-/**
- * 청약통장 다음 마일스톤
- * 다음 연도 도달 날짜 및 추가 점수 반환
- */
-export function getSubscriptionNextMilestone(startDate: string): {
-  nextScore: number;
-  gainScore: number;
-  monthsLeft: number;
-  nextDateLabel: string;
-} | null {
-  const currentScore = calculateSubscriptionScore(startDate);
-  if (currentScore >= 17) return null;
-
-  const [year, month] = startDate.split('-').map(Number);
-  if (!year || !month) return null;
-
-  const start = new Date(year, month - 1, 1);
-  const now = new Date();
-  const yearsElapsed = (now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
-  const nextYear = Math.floor(yearsElapsed) + 1;
-  const nextDate = new Date(start.getFullYear() + nextYear, start.getMonth(), 1);
-  const monthsLeft = Math.max(
-    1,
-    Math.ceil((nextDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30.44)),
-  );
-  const nextDateLabel = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`;
-
-  return {
-    nextScore: currentScore + 2,
-    gainScore: 2,
-    monthsLeft,
-    nextDateLabel,
-  };
-}
-
-/**
- * 특별공급 자격 판정
- * - 신혼부부: 기혼 + 혼인 7년 이내
- * - 생애최초: 무주택 + 청약통장 납입 12회 이상
+ * 특별공급 자격 판정 (세 유형 모두 무주택 세대 조건)
+ * - 신혼부부: 혼인 7년 이내
+ * - 생애최초: 청약통장 납입 12회 이상
  * - 다자녀: 미성년(만 19세 미만) 자녀 3명 이상
  */
 export function calculateSpecialSupply(
   input: EligibilityInput,
 ): SpecialSupplyEligibility {
-  // 신혼부부: 기혼 + 혼인 7년 이내
-  const newlyWed = input.isMarried && calcMarriageYears(input.marriageDate) <= 7;
+  // 신혼부부: 무주택 + 기혼 + 혼인 7년 이내
+  const newlyWed =
+    input.isHomeless && input.isMarried && calcMarriageYears(input.marriageDate) <= 7;
 
   // 생애최초: 무주택 + 청약통장 납입 횟수 12회 이상
   const firstHome =
     input.isHomeless && input.subscriptionPaymentCount >= 12;
 
-  // 다자녀: 미성년(만 19세 미만) 자녀 3명 이상
-  const multiChild = (input.childrenCount ?? 0) >= 3;
+  // 다자녀: 무주택 + 미성년(만 19세 미만) 자녀 3명 이상
+  const multiChild = input.isHomeless && (input.childrenCount ?? 0) >= 3;
 
   return { newlyWed, firstHome, multiChild };
 }

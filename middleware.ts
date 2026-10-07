@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { refreshAccessToken, type RefreshResult } from '@/lib/auth/kakao';
+import { refreshAccessToken } from '@/lib/auth/kakao';
 
 const ACCESS_TOKEN_COOKIE = 'blue_access_token';
 const REFRESH_TOKEN_COOKIE = 'blue_refresh_token';

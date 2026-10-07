@@ -6,7 +6,7 @@ import {
   MOCK_ANNOUNCEMENTS,
 } from '@/lib/announcements';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 3600;
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);

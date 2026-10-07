@@ -2,7 +2,8 @@
 export interface EligibilityInput {
   // 무주택 정보
   isHomeless: boolean;
-  homelessYears: number; // 무주택 기간 (년)
+  birthDate: string; // 생년월일 YYYY-MM 형식
+  homelessYears: number; // 무주택 기간 (년, 정책 기준 자동 계산값)
 
   // 부양가족
   dependentsCount: number; // 부양가족 수 (배우자 포함)
@@ -50,21 +51,14 @@ export interface StoredScoreData {
 // 청약 접수 상태 타입
 export type SubscriptionStatus = '접수중' | '접수예정' | '마감';
 
-// 주택형별 공급 정보 타입
-export interface HouseType {
-  houseTypeName: string;  // 예: "59.95㎡"
-  supplyCount: number;    // 공급 세대수
-  price: number | null;   // 만원 단위, null이면 미공개
-  priceDisplay: string;   // 예: "20억 2,600만원"
-}
-
 // 청약 공고 타입
 export interface Announcement {
   id: string;
+  pblancNo?: string; // 공고번호 (청약홈 상세 URL용)
   complexName: string; // 단지명
   builder: string; // 건설사
   region: string; // 지역
-  address?: string; // 공급위치 (예: 서울특별시 강남구 ○○동 123)
+  address?: string; // 공급 위치(주소)
   announcementDate: string; // 모집공고일
   subscriptionStartDate: string; // 청약 접수 시작일
   subscriptionEndDate: string; // 청약 접수 종료일
@@ -72,9 +66,48 @@ export interface Announcement {
   pdfUrl?: string; // 원문 공고문 URL
   totalHouseholds?: number; // 공급 세대수
   status?: SubscriptionStatus; // 접수 상태
-  specialSupplyTypes?: {
-    newlyWed: boolean;   // 신혼부부 특별공급 있음
-    firstHome: boolean;  // 생애최초 특별공급 있음
-    multiChild: boolean; // 다자녀 특별공급 있음
+  specialSupplyCounts?: SpecialSupplyCounts; // 특별공급 유형별 세대수 (주택형별 API 합산)
+  supplyKind?: '민영' | '국민'; // 민영주택(가점제) / 국민주택(공공분양, 납입횟수 순차제)
+  regulation?: {
+    speculationOverheated: boolean; // 투기과열지구
+    adjustedArea: boolean;          // 조정대상지역
+    priceCap: boolean;              // 분양가상한제
   };
+}
+
+// 특별공급 유형별 세대수
+export interface SpecialSupplyCounts {
+  newlyWed: number;    // 신혼부부
+  firstHome: number;   // 생애최초
+  multiChild: number;  // 다자녀
+  newborn: number;     // 신생아
+  youth: number;       // 청년
+  oldParents: number;  // 노부모부양
+  institution: number; // 기관추천
+  other: number;       // 이전기관·기타
+  generalTotal: number; // 일반공급 합계
+}
+
+// 청약홈 스크래핑 상세 데이터
+export interface AnnouncementDetail {
+  location?: string;        // 공급 위치
+  totalSupply?: string;     // 공급 규모
+  operator?: string;        // 시행사
+  constructor?: string;     // 시공사
+  moveInDate?: string;      // 입주 예정월
+  announcementDate?: string; // 모집공고일
+  winnerDate?: string;       // 당첨자 발표일
+  contractPeriod?: string;   // 계약일
+  schedule: {
+    type: string;   // 특별공급 / 1순위 / 2순위
+    localDate?: string;
+    otherDate?: string;
+    place?: string;
+  }[];
+  units: {
+    type: string;         // 주택형 (예: 084.40A)
+    supplyArea?: string;  // 공급면적
+    totalCount?: string;  // 공급 세대수
+    price?: string;       // 분양가
+  }[];
 }

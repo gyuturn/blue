@@ -3,8 +3,19 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Disclaimer from '@/components/Disclaimer';
+import { BottomSheet } from '@/components/ui/BottomSheet';
 import type { Announcement, StoredScoreData } from '@/types';
-import { getDday, getDdayBadgeStyle, getScoreTierLabel, getGeneralSupplyLabel, getSpecialSupplyLabels } from '@/lib/announcements';
+import { getDday, getDdayBadgeStyle } from '@/lib/announcements';
+import { CompetitionSummary, SpecialSupplyChips } from '@/components/announcements/CompetitionInsight';
+import type { AnnouncementDetail } from '@/types';
+import { useFavorites } from '@/hooks/useFavorites';
+import type { SessionUser } from '@/types/auth';
+import Tooltip from '@/components/Tooltip';
+import { TERM_MAP } from '@/lib/terms';
+import { CopyButton } from '@/components/ui/CopyButton';
+import { getMapSearchUrl } from '@/lib/maps';
+import { readLocalStorage } from '@/hooks/useLocalStorage';
+import { LAST_SCORE_KEY, isEligibilityInput, parseSavedScore, toStoredScoreData } from '@/lib/scoreStorage';
 
 const REGION_OPTIONS = [
   '전체',
@@ -27,6 +38,26 @@ const REGION_OPTIONS = [
   '제주특별자치도',
 ];
 
+function formatPriceKorean(raw: string): string {
+  const num = parseInt(raw.replace(/,/g, ''), 10);
+  if (isNaN(num) || num <= 0) return '-';
+  const 억 = Math.floor(num / 10000);
+  const 만 = num % 10000;
+  if (억 > 0 && 만 > 0) return `${억}억 ${만.toLocaleString('ko-KR')}만원`;
+  if (억 > 0) return `${억}억`;
+  return `${만.toLocaleString('ko-KR')}만원`;
+}
+
+// 주택형 코드(예: 059.7421B)의 앞 숫자 = 전용면적(㎡) → "전용 59.74㎡ · 약 18평"
+function formatAreaWithPyeong(unitType: string): string | null {
+  const m = unitType.trim().match(/^(\d+(?:\.\d+)?)/);
+  if (!m) return null;
+  const sqm = parseFloat(m[1]);
+  if (!isFinite(sqm) || sqm <= 0) return null;
+  const pyeong = Math.round(sqm * 0.3025);
+  return `전용 ${sqm.toFixed(2)}㎡ · 약 ${pyeong}평`;
+}
+
 const tierBadgeStyle: Record<string, string> = {
   S: 'bg-yellow-100 text-yellow-700',
   A: 'bg-blue-100 text-blue-700',
@@ -41,23 +72,73 @@ export default function AnnouncementsPage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRegion, setSelectedRegion] = useState('전체');
-  const [isMock, setIsMock] = useState(false);
-  const [hideExpired, setHideExpired] = useState(true);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('scoreData');
-      if (!raw) {
-        router.push('/calculator');
-        return;
+    const saved = localStorage.getItem('preferred_region');
+    if (saved && REGION_OPTIONS.includes(saved)) setSelectedRegion(saved);
+  }, []);
+  const [isMock, setIsMock] = useState(false);
+  const [hideExpired, setHideExpired] = useState(true);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
+  const [sessionUser, setSessionUser] = useState<SessionUser | null | undefined>(undefined);
+  const [activeTab, setActiveTab] = useState<'all' | 'favorites'>('all');
+  const [scoreFromDB, setScoreFromDB] = useState(false);
+
+  const authReady = sessionUser !== undefined;
+  const { favoriteIds, toggle: toggleFavorite } = useFavorites(authReady ? !!sessionUser : null);
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((u) => setSessionUser(u))
+      .catch(() => setSessionUser(null));
+  }, []);
+
+  useEffect(() => {
+    const loadScore = async () => {
+      // 1) sessionStorage 우선
+      try {
+        const raw = sessionStorage.getItem('scoreData');
+        if (raw) {
+          setScoreData(JSON.parse(raw));
+          setAuthChecked(true);
+          return;
+        }
+      } catch {}
+
+      // 2) 이 기기 기록과 (로그인 시) 계정 기록 중 더 최근 것
+      const saved = parseSavedScore(readLocalStorage(LAST_SCORE_KEY));
+      let fromAccount: StoredScoreData | null = null;
+      try {
+        const meRes = await fetch('/api/auth/me');
+        if (meRes.ok) {
+          const latestRes = await fetch('/api/scores/latest');
+          if (latestRes.status === 200) {
+            const latest = await latestRes.json();
+            if (isEligibilityInput(latest.inputSnapshot)) {
+              fromAccount = toStoredScoreData(latest.inputSnapshot, new Date(latest.createdAt).getTime());
+            }
+          }
+        }
+      } catch {}
+
+      const fromDevice = saved ? toStoredScoreData(saved.input, saved.savedAt) : null;
+      const chosen =
+        fromDevice && (!fromAccount || fromDevice.savedAt >= fromAccount.savedAt) ? fromDevice : fromAccount;
+
+      if (chosen) {
+        try {
+          sessionStorage.setItem('scoreData', JSON.stringify(chosen));
+        } catch {}
+        setScoreData(chosen);
+        setScoreFromDB(chosen === fromAccount);
       }
-      const parsed: StoredScoreData = JSON.parse(raw);
-      setScoreData(parsed);
-    } catch {
-      router.push('/calculator');
-    } finally {
+
+      // 3) 모두 없으면 점수 없이 공고 표시
       setAuthChecked(true);
-    }
+    };
+
+    loadScore();
   }, [router]);
 
   useEffect(() => {
@@ -79,9 +160,13 @@ export default function AnnouncementsPage() {
     fetchData();
   }, [selectedRegion]);
 
-  const filteredAnnouncements = hideExpired
+  const baseAnnouncements = hideExpired
     ? announcements.filter(a => a.status !== '마감')
     : announcements;
+
+  const filteredAnnouncements = activeTab === 'favorites'
+    ? baseAnnouncements.filter(a => favoriteIds.includes(a.id))
+    : baseAnnouncements;
 
   if (!authChecked) {
     return (
@@ -118,7 +203,7 @@ export default function AnnouncementsPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">청약 공고</h1>
-              <p className="text-gray-500 text-sm mt-1">최신 청약 공고를 확인하세요</p>
+              <p className="text-gray-500 text-sm mt-1">최신 <Tooltip term={TERM_MAP.gonggoPyo.term} definition={TERM_MAP.gonggoPyo.shortDef}>모집공고</Tooltip>를 확인하세요</p>
             </div>
             {!loading && (
               isMock ? (
@@ -134,10 +219,41 @@ export default function AnnouncementsPage() {
           </div>
         </div>
 
+        {/* 저장된 점수 사용 배너 */}
+        {scoreFromDB && scoreData && (
+          <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-3 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-amber-600">📋</span>
+              <span className="text-amber-700 font-medium">
+                {new Date(scoreData.savedAt).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} 저장된 점수로 보는 중
+              </span>
+            </div>
+            <button onClick={() => router.push('/calculator')} className="text-xs text-amber-700 font-semibold underline">
+              재계산
+            </button>
+          </div>
+        )}
+
+        {/* 가점 유도 배너 (점수 없을 때) */}
+        {!scoreData && (
+          <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-4">
+            <div className="flex items-center gap-2">
+              <span className="text-blue-500">📊</span>
+              <span className="text-sm text-blue-700">가점을 입력하면 맞춤 공고를 볼 수 있어요</span>
+            </div>
+            <button
+              onClick={() => router.push('/calculator')}
+              className="text-xs font-semibold text-white bg-blue-600 px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors whitespace-nowrap"
+            >
+              가점 입력
+            </button>
+          </div>
+        )}
+
         {/* Score Summary Bar */}
         {scoreData && (
-          <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-4">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-4">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm text-gray-600">내 가점</span>
               <span className="text-lg font-bold text-blue-700">{scoreData.result.totalScore}점</span>
               <span className="text-xs text-gray-500">/ 84점</span>
@@ -154,6 +270,22 @@ export default function AnnouncementsPage() {
           </div>
         )}
 
+        {/* 전체 / 즐겨찾기 탭 */}
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all ${activeTab === 'all' ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}
+          >
+            전체 공고
+          </button>
+          <button
+            onClick={() => setActiveTab('favorites')}
+            className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-1 ${activeTab === 'favorites' ? 'bg-red-500 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}
+          >
+            <span>♥</span> 즐겨찾기 {favoriteIds.length > 0 && <span className={`text-xs px-1.5 py-0.5 rounded-full ${activeTab === 'favorites' ? 'bg-white/20' : 'bg-red-100 text-red-500'}`}>{favoriteIds.length}</span>}
+          </button>
+        </div>
+
         {/* Region Filter & Expired Toggle */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
@@ -168,11 +300,14 @@ export default function AnnouncementsPage() {
               </button>
             </div>
           </div>
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+          <div className="flex overflow-x-auto gap-2 pb-1 scrollbar-hide">
             {REGION_OPTIONS.map((region) => (
               <button
                 key={region}
-                onClick={() => setSelectedRegion(region)}
+                onClick={() => {
+                  setSelectedRegion(region);
+                  localStorage.setItem('preferred_region', region);
+                }}
                 className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   selectedRegion === region
                     ? 'bg-blue-600 text-white shadow-sm'
@@ -220,28 +355,35 @@ export default function AnnouncementsPage() {
           </div>
         ) : filteredAnnouncements.length === 0 ? (
           <div className="text-center py-12">
-            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <svg
-                className="w-6 h-6 text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                />
-              </svg>
-            </div>
-            <p className="text-gray-500 font-medium">해당 지역 공고가 없습니다</p>
-            <p className="text-gray-400 text-sm mt-1">다른 지역을 선택해 보세요</p>
+            {activeTab === 'favorites' ? (
+              <>
+                <div className="text-4xl mb-3">♡</div>
+                <p className="text-gray-500 font-medium">즐겨찾기한 공고가 없어요</p>
+                <p className="text-gray-400 text-sm mt-1">마음에 드는 공고의 하트를 눌러보세요</p>
+              </>
+            ) : (
+              <>
+                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                </div>
+                <p className="text-gray-500 font-medium">해당 지역 공고가 없습니다</p>
+                <p className="text-gray-400 text-sm mt-1">다른 지역을 선택해 보세요</p>
+              </>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
             {filteredAnnouncements.map((item) => (
-              <AnnouncementCard key={item.id} announcement={item} scoreData={scoreData} />
+              <AnnouncementCard
+                key={item.id}
+                announcement={item}
+                scoreData={scoreData}
+                onSelect={setSelectedAnnouncement}
+                isFavorite={favoriteIds.includes(item.id)}
+                onToggleFavorite={toggleFavorite}
+              />
             ))}
           </div>
         )}
@@ -255,6 +397,12 @@ export default function AnnouncementsPage() {
 
         <Disclaimer />
       </div>
+
+      {selectedAnnouncement && (
+        <BottomSheet isOpen={!!selectedAnnouncement} onClose={() => setSelectedAnnouncement(null)}>
+          <AnnouncementDetail key={selectedAnnouncement.id} announcement={selectedAnnouncement} scoreData={scoreData} />
+        </BottomSheet>
+      )}
     </main>
   );
 }
@@ -277,21 +425,21 @@ function StatusBadge({ status }: { status: string | undefined }) {
   );
 }
 
-function AnnouncementCard({ announcement, scoreData }: { announcement: Announcement; scoreData: StoredScoreData | null }) {
-  const router = useRouter();
+function AnnouncementCard({
+  announcement, scoreData, onSelect, isFavorite, onToggleFavorite,
+}: {
+  announcement: Announcement;
+  scoreData: StoredScoreData | null;
+  onSelect: (a: Announcement) => void;
+  isFavorite: boolean;
+  onToggleFavorite: (a: Announcement) => void;
+}) {
   const dday = getDday(announcement.subscriptionStartDate, announcement.subscriptionEndDate);
   const ddayBadge = getDdayBadgeStyle(dday);
 
   const handleCardClick = () => {
-    try {
-      localStorage.setItem('selectedAnnouncement', JSON.stringify(announcement));
-    } catch {}
-    router.push(`/announcements/${announcement.id}`);
+    onSelect(announcement);
   };
-
-  const tierLabel = scoreData ? getScoreTierLabel(scoreData.result.tier) : null;
-  const generalSupply = scoreData ? getGeneralSupplyLabel(scoreData.input) : null;
-  const specialLabels = scoreData ? getSpecialSupplyLabels(scoreData.specialSupply, announcement.specialSupplyTypes) : [];
 
   return (
     <div
@@ -310,32 +458,39 @@ function AnnouncementCard({ announcement, scoreData }: { announcement: Announcem
                 {ddayBadge.label}
               </span>
             )}
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleFavorite(announcement); }}
+              className="text-lg leading-none transition-transform active:scale-90"
+              aria-label={isFavorite ? '즐겨찾기 해제' : '즐겨찾기 추가'}
+            >
+              {isFavorite ? '♥' : '♡'}
+            </button>
           </div>
         </div>
 
         <div className="space-y-1.5 text-xs text-gray-600">
-          <div className="flex items-center gap-2">
+          <div className="flex items-start gap-2">
             <span className="text-gray-400 w-14 flex-shrink-0">건설사</span>
-            <span className="font-medium">{announcement.builder}</span>
+            <span className="font-medium min-w-0 break-words">{announcement.builder}</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-start gap-2">
             <span className="text-gray-400 w-14 flex-shrink-0">지역</span>
-            <span>{announcement.region}</span>
+            <span className="min-w-0 break-words">{announcement.region}</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-start gap-2">
             <span className="text-gray-400 w-14 flex-shrink-0">유형</span>
-            <span>{announcement.houseType}</span>
+            <span className="min-w-0 break-words">{announcement.houseType}</span>
           </div>
           {announcement.totalHouseholds !== undefined && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-start gap-2">
               <span className="text-gray-400 w-14 flex-shrink-0">세대수</span>
               <span>{announcement.totalHouseholds.toLocaleString()}세대</span>
             </div>
           )}
           {announcement.subscriptionStartDate && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-start gap-2">
               <span className="text-gray-400 w-14 flex-shrink-0">접수기간</span>
-              <span>
+              <span className="min-w-0 break-words">
                 {announcement.subscriptionStartDate} ~{' '}
                 {announcement.subscriptionEndDate}
               </span>
@@ -344,52 +499,253 @@ function AnnouncementCard({ announcement, scoreData }: { announcement: Announcem
         </div>
       </div>
 
-      {scoreData && (
-        <div className="flex flex-wrap gap-1.5 px-4 pb-3">
-          {tierLabel && (
-            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${tierLabel.style}`}>
-              {tierLabel.text}
-            </span>
-          )}
-          {generalSupply && !generalSupply.eligible && (
-            <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-red-50 text-red-500">
-              {generalSupply.text}
-            </span>
-          )}
-          {specialLabels.map((label) => (
-            <span key={label} className="text-xs px-2 py-0.5 rounded-full font-semibold bg-purple-100 text-purple-700">
-              {label}
-            </span>
-          ))}
-        </div>
-      )}
+      <div className="space-y-3 px-4 pb-3">
+        <SpecialSupplyChips announcement={announcement} scoreData={scoreData} />
+        {scoreData && <CompetitionSummary announcement={announcement} scoreData={scoreData} maxReasons={2} />}
+      </div>
 
-      {announcement.pdfUrl && (
-        <div className="border-t border-gray-100 px-4 py-3">
-          <a
-            href={announcement.pdfUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="flex items-center justify-center gap-2 text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
-          >
-            <svg
-              className="w-3.5 h-3.5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+      {(announcement.pdfUrl || announcement.address) && (
+        <div className="border-t border-gray-100 px-4 py-3 space-y-2.5">
+          {announcement.address && <AddressActions address={announcement.address} />}
+          {announcement.pdfUrl && (
+            <a
+              href={announcement.pdfUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center justify-center gap-2 text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-              />
-            </svg>
-            공고문 바로가기 (청약홈)
-          </a>
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                />
+              </svg>
+              공고문 바로가기 (<Tooltip term={TERM_MAP.cheongYangHome.term} definition={TERM_MAP.cheongYangHome.shortDef}>청약홈</Tooltip>)
+            </a>
+          )}
         </div>
       )}
     </div>
   );
+}
+
+const COPY_ICON = (
+  <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+  </svg>
+);
+
+// 주소 복사 + 네이버지도/카카오맵 바로가기 (지도에는 주소가 검색어로 자동 입력된다)
+function AddressActions({ address, size = 'sm' }: { address: string; size?: 'sm' | 'md' }) {
+  const naverMapUrl = getMapSearchUrl('naver', address);
+  const kakaoMapUrl = getMapSearchUrl('kakao', address);
+  const base = `flex items-center justify-center gap-1.5 rounded-xl font-semibold transition-colors ${
+    size === 'md' ? 'py-2.5 text-xs' : 'py-2 text-[11px]'
+  }`;
+
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      <CopyButton
+        text={address}
+        label="주소 복사"
+        icon={COPY_ICON}
+        className={`${base} border border-gray-200 text-gray-600 hover:bg-gray-50`}
+      />
+      {naverMapUrl && (
+        <a
+          href={naverMapUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className={`${base} bg-[#03C75A] text-white hover:opacity-90`}
+        >
+          네이버지도
+        </a>
+      )}
+      {kakaoMapUrl && (
+        <a
+          href={kakaoMapUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className={`${base} bg-[#FEE500] text-gray-900 hover:opacity-90`}
+        >
+          카카오맵
+        </a>
+      )}
+    </div>
+  );
+}
+
+function AnnouncementDetail({ announcement, scoreData }: { announcement: Announcement; scoreData: StoredScoreData | null }) {
+  const [detail, setDetail] = useState<AnnouncementDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(true);
+  const [detailError, setDetailError] = useState(false);
+
+  const dday = getDday(announcement.subscriptionStartDate, announcement.subscriptionEndDate);
+  const ddayBadge = getDdayBadgeStyle(dday);
+
+  // 목록 API 주소가 없으면 청약홈 상세의 위치로 대체
+  const address = announcement.address ?? detail?.location;
+
+  // 공고가 바뀌면 key로 다시 마운트되므로 로딩 상태 초기화가 필요 없다
+  useEffect(() => {
+    const houseManageNo = announcement.id;
+    const pblancNo = announcement.pblancNo ?? announcement.id;
+    fetch(`/api/announcements/detail?houseManageNo=${houseManageNo}&pblancNo=${pblancNo}`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.data) setDetail(json.data);
+        else setDetailError(true);
+      })
+      .catch(() => setDetailError(true))
+      .finally(() => setDetailLoading(false));
+  }, [announcement.id, announcement.pblancNo]);
+
+  return (
+    <div className="px-5 pb-8">
+      {/* 단지명 + 상태 */}
+      <div className="flex items-start justify-between gap-2 mb-1">
+        <h2 className="text-lg font-bold text-gray-900 leading-snug flex-1">{announcement.complexName}</h2>
+        <div className="flex items-center gap-1.5 flex-shrink-0 mt-0.5">
+          <StatusBadge status={announcement.status} />
+          {dday && dday !== '마감' && (
+            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${ddayBadge.className}`}>
+              {ddayBadge.label}
+            </span>
+          )}
+        </div>
+      </div>
+      <p className="text-sm text-gray-500 mb-4">{announcement.builder} · {announcement.region}</p>
+
+      {/* 단지 위치 */}
+      {address && (
+        <div className="bg-gray-50 rounded-xl p-4 mb-4">
+          <SectionLabel>단지 위치</SectionLabel>
+          <p className="text-sm text-gray-800 break-keep mt-2 mb-3">{address}</p>
+          <AddressActions address={address} size="md" />
+        </div>
+      )}
+
+      {/* 내 경쟁 분석 + 특별공급 */}
+      <div className="space-y-3 mb-4">
+        {scoreData && (
+          <div className="bg-blue-50 rounded-xl p-3">
+            <p className="text-xs font-bold text-blue-800 mb-1.5">내 경쟁 분석</p>
+            <CompetitionSummary announcement={announcement} scoreData={scoreData} />
+          </div>
+        )}
+        <SpecialSupplyChips announcement={announcement} scoreData={scoreData} />
+      </div>
+
+      {/* 청약홈 상세 데이터 */}
+      {detailLoading ? (
+        <div className="space-y-3 mb-4">
+          {[1, 2, 3].map((n) => (
+            <div key={n} className="h-10 bg-gray-100 rounded-xl animate-pulse" />
+          ))}
+        </div>
+      ) : detailError || !detail ? (
+        /* 스크래핑 실패 시 기존 API 데이터로 폴백 */
+        <div className="bg-gray-50 rounded-xl p-4 space-y-3 mb-4">
+          {announcement.subscriptionStartDate && (
+            <InfoRow label="청약 접수" value={`${announcement.subscriptionStartDate} ~ ${announcement.subscriptionEndDate}`} />
+          )}
+          {announcement.announcementDate && (
+            <InfoRow label="공고일" value={announcement.announcementDate} />
+          )}
+          <InfoRow label="주택 유형" value={announcement.houseType} />
+          {announcement.totalHouseholds !== undefined && (
+            <InfoRow label="총 세대수" value={`${announcement.totalHouseholds.toLocaleString()}세대`} />
+          )}
+        </div>
+      ) : (
+        <>
+          {/* 기본 정보 */}
+          <div className="bg-gray-50 rounded-xl p-4 space-y-3 mb-4">
+            <SectionLabel>기본 정보</SectionLabel>
+            {detail.totalSupply && <InfoRow label="공급 규모" value={detail.totalSupply} />}
+            {detail.constructor && <InfoRow label="시공사" value={detail.constructor} />}
+            {detail.operator && <InfoRow label="시행사" value={detail.operator} />}
+            {detail.moveInDate && <InfoRow label="입주 예정" value={detail.moveInDate} highlight />}
+          </div>
+
+          {/* 청약 일정 */}
+          <div className="bg-gray-50 rounded-xl p-4 mb-4">
+            <SectionLabel>청약 일정</SectionLabel>
+            <div className="space-y-3 mt-3">
+              {detail.announcementDate && <InfoRow label="모집공고일" value={detail.announcementDate} />}
+              {detail.schedule.map((s) => (
+                <div key={s.type} className="flex items-start gap-2 text-sm">
+                  <span className="text-gray-400 w-20 flex-shrink-0 text-xs pt-0.5">{s.type}</span>
+                  <div>
+                    <p className="text-gray-800 font-medium text-xs">{s.localDate || s.otherDate}</p>
+                    {s.place && <p className="text-gray-400 text-xs">{s.place}</p>}
+                  </div>
+                </div>
+              ))}
+              {detail.winnerDate && <InfoRow label="당첨자 발표" value={detail.winnerDate} highlight />}
+              {detail.contractPeriod && <InfoRow label="계약일" value={detail.contractPeriod} />}
+            </div>
+          </div>
+
+          {/* 주택형별 공급 */}
+          {detail.units.length > 0 && (
+            <div className="mb-4">
+              <SectionLabel>주택형별 공급</SectionLabel>
+              <div className="mt-3 space-y-2">
+                {detail.units.map((u, i) => {
+                  const areaText = formatAreaWithPyeong(u.type);
+                  return (
+                  <div key={i} className="rounded-xl border border-gray-100 bg-white px-3 py-2.5">
+                    <p className="text-xs font-semibold text-gray-800 mb-1">{u.type}</p>
+                    {areaText && <p className="text-xs text-gray-500 mb-1">{areaText}</p>}
+                    <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-600">
+                      <span>세대수 <span className="font-medium text-gray-800">{u.totalCount || '-'}</span></span>
+                      <span>분양가 <span className="font-medium text-gray-800">{u.price ? formatPriceKorean(u.price) : '-'}</span></span>
+                    </div>
+                  </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* 청약홈 바로가기 */}
+      <a
+        href={`https://www.applyhome.co.kr/ai/aia/selectAPTLttotPblancDetail.do?houseManageNo=${announcement.id}&pblancNo=${announcement.pblancNo ?? announcement.id}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center justify-center gap-2 w-full py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+        </svg>
+        청약홈에서 직접 보기
+      </a>
+    </div>
+  );
+}
+
+function InfoRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <div className="flex items-start gap-2 text-sm">
+      <span className="text-gray-400 w-20 flex-shrink-0 text-xs pt-0.5">{label}</span>
+      <span className={`font-medium text-xs leading-snug ${highlight ? 'text-blue-600' : 'text-gray-800'}`}>{value}</span>
+    </div>
+  );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">{children}</p>;
 }

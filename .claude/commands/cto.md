@@ -5,21 +5,27 @@
 ## 입력
 이슈 번호: $ARGUMENTS
 
+## Agent Use Policy
+⚪ 설계 판단은 **인라인**.
+🟢 변경이 여러 영역(`lib/`·`app/api/*`·`app/*/page.tsx`·`lib/db/schema.ts`)에 걸치면 `impact-analyst` 서브에이전트를 **영역별로 병렬 호출**해 영향 범위를 요약으로 확보 → 설계에 반영. 단일 파일 소규모면 인라인 조사.
+
 ## 수행 작업
 
 1. **이슈 검토**: `gh issue view [이슈번호]`로 요구사항 및 기획 확인
 2. **기술 검토**: 기술적 실현 가능성 분석
-3. **설계 문서 작성**: `/docs` 디렉토리에 설계 문서 작성
+   - 🟢 영향 범위가 넓으면 `impact-analyst` 병렬 fan-out으로 조사
+3. **설계 문서 작성**: `docs/technical/` 또는 `docs/architecture/`에 설계 문서 작성
 4. **기술 의견 공유**: 이슈 댓글로 기술 검토 의견 추가
 
 ## Tech Stack
-- **Backend**: Python 3.11+, FastAPI, SQLAlchemy
-- **Frontend**: Streamlit + Plotly
-- **Database**: SQLite
-- **AI/LLM**: Claude API (Anthropic)
-- **주식 데이터**: FinanceDataReader, pykrx, yfinance
-- **증권사 연동**: 한국투자증권 OpenAPI (python-kis)
-- **배포**: Docker Compose (로컬)
+- **Frontend**: Next.js 16 (App Router, TypeScript), Tailwind CSS v4
+- **Backend**: Next.js API Routes (`app/api/*`)
+- **Database**: Supabase (PostgreSQL) + Drizzle ORM
+- **인증**: Kakao OAuth
+- **외부 데이터**: 공공데이터포털 청약홈 분양공고 API
+- **배포**: Vercel (GitHub Actions CD, `cd.yml`)
+- **CI**: GitHub Actions (`ci.yml` — build + lint)
+- **테스트**: 현재 테스트 러너 미도입
 
 ## 기술 검토 Template
 
@@ -38,12 +44,12 @@
 [아키텍처 관련 고려사항]
 
 ### API 설계 (해당 시)
-[HTTP Method] /api/v1/[endpoint]
+[HTTP Method] /api/[endpoint]
 Request: { }
 Response: { }
 
 ### 데이터 모델 (해당 시)
-[SQLAlchemy 모델 설계]
+[Drizzle 스키마 설계]
 
 ### 예상 리스크
 - [리스크 1]
@@ -56,8 +62,8 @@ Response: { }
 ## 명령어
 - 이슈 조회: `gh issue view [번호]`
 - 이슈 댓글 추가: `gh issue comment [번호] --body "[기술 검토 내용]"`
-- 문서 관리: `/docs` 디렉토리에 직접 작성
+- 문서 관리: `docs/technical/` 또는 `docs/architecture/`에 직접 작성
 
 ## 출력
-- `/docs`에 설계 문서 작성
+- `docs/`에 설계 문서 작성
 - 이슈에 기술 검토 의견 댓글 추가

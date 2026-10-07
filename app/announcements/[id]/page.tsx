@@ -1,13 +1,14 @@
 'use client';
 
-import { use, useEffect, useMemo, useState } from 'react';
+import { use, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Disclaimer from '@/components/Disclaimer';
-import type { Announcement, HouseType, StoredScoreData } from '@/types';
-import { getDday, getDdayBadgeStyle, getScoreTierLabel, getGeneralSupplyLabel, getSpecialSupplyLabels } from '@/lib/announcements';
+import type { Announcement, StoredScoreData } from '@/types';
+import { getDday, getDdayBadgeStyle } from '@/lib/announcements';
+import { CompetitionSummary, SpecialSupplyChips } from '@/components/announcements/CompetitionInsight';
 import { Tooltip } from '@/components/ui/Tooltip';
-import { CopyButton } from '@/components/ui/CopyButton';
-import { getMapSearchUrl } from '@/lib/maps';
+import { readLocalStorage } from '@/hooks/useLocalStorage';
+import { LAST_SCORE_KEY, parseSavedScore, toStoredScoreData } from '@/lib/scoreStorage';
 
 export default function AnnouncementDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -15,7 +16,7 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
 
   const announcement = useMemo((): Announcement | null => {
     try {
-      const stored = localStorage.getItem('selectedAnnouncement');
+      const stored = sessionStorage.getItem('selectedAnnouncement');
       if (!stored) return null;
       const parsed = JSON.parse(stored) as Announcement;
       return parsed.id === id ? parsed : null;
@@ -26,37 +27,18 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
 
   const scoreData = useMemo((): StoredScoreData | null => {
     try {
-      const stored = localStorage.getItem('scoreData');
-      return stored ? (JSON.parse(stored) as StoredScoreData) : null;
-    } catch {
-      return null;
-    }
+      const stored = sessionStorage.getItem('scoreData');
+      if (stored) return JSON.parse(stored) as StoredScoreData;
+    } catch {}
+    const saved = parseSavedScore(readLocalStorage(LAST_SCORE_KEY));
+    return saved ? toStoredScoreData(saved.input, saved.savedAt) : null;
   }, []);
-
-  const [houseTypes, setHouseTypes] = useState<HouseType[]>([]);
-  const [houseTypesLoading, setHouseTypesLoading] = useState(false);
 
   useEffect(() => {
     if (!announcement) {
       router.push('/announcements');
     }
   }, [announcement, router]);
-
-  useEffect(() => {
-    if (!id) return;
-    setHouseTypesLoading(true);
-    fetch(`/api/announcements/${id}/house-types`)
-      .then((res) => res.json())
-      .then((json) => {
-        setHouseTypes(Array.isArray(json.data) ? json.data : []);
-      })
-      .catch(() => {
-        setHouseTypes([]);
-      })
-      .finally(() => {
-        setHouseTypesLoading(false);
-      });
-  }, [id]);
 
   if (!announcement) {
     return (
@@ -74,13 +56,6 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
       : announcement.status === '접수예정'
       ? 'bg-blue-100 text-blue-700'
       : 'bg-gray-100 text-gray-500';
-
-  const tierLabel = scoreData ? getScoreTierLabel(scoreData.result.tier) : null;
-  const generalSupply = scoreData ? getGeneralSupplyLabel(scoreData.input) : null;
-  const specialLabels = scoreData ? getSpecialSupplyLabels(scoreData.specialSupply, announcement.specialSupplyTypes) : [];
-  const hasMatchInfo = tierLabel || generalSupply || specialLabels.length > 0;
-  const naverMapUrl = announcement.address ? getMapSearchUrl('naver', announcement.address) : null;
-  const kakaoMapUrl = announcement.address ? getMapSearchUrl('kakao', announcement.address) : null;
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -118,41 +93,6 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
             {announcement.builder} · {announcement.region} · {announcement.houseType}
           </p>
         </div>
-
-        {/* 단지 위치 */}
-        {announcement.address && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
-            <h2 className="text-sm font-bold text-gray-700 mb-2">단지 위치</h2>
-            <p className="text-sm text-gray-800 break-keep mb-4">{announcement.address}</p>
-            <div className="grid grid-cols-3 gap-2">
-              <CopyButton
-                text={announcement.address}
-                label="주소 복사"
-                className="py-2.5 border border-gray-200 text-gray-700 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-colors"
-              />
-              {naverMapUrl && (
-                <a
-                  href={naverMapUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="py-2.5 text-center bg-green-500 text-white rounded-xl text-xs font-semibold hover:bg-green-600 transition-colors"
-                >
-                  네이버지도
-                </a>
-              )}
-              {kakaoMapUrl && (
-                <a
-                  href={kakaoMapUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="py-2.5 text-center bg-yellow-300 text-gray-900 rounded-xl text-xs font-semibold hover:bg-yellow-400 transition-colors"
-                >
-                  카카오맵
-                </a>
-              )}
-            </div>
-          </div>
-        )}
 
         {/* 청약 일정 */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
@@ -202,50 +142,8 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
           </div>
         )}
 
-        {/* 주택형별 공급 정보 */}
-        {houseTypesLoading && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
-            <h2 className="text-sm font-bold text-gray-700 mb-4">주택형별 공급 정보</h2>
-            <div className="space-y-2">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-8 bg-gray-100 rounded animate-pulse" />
-              ))}
-            </div>
-          </div>
-        )}
-        {!houseTypesLoading && houseTypes.length > 0 && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
-            <div className="flex items-center gap-2 mb-4">
-              <h2 className="text-sm font-bold text-gray-700">주택형별 공급 정보</h2>
-              <Tooltip content="전용면적: 실제 거주 공간의 면적(베란다 제외). 분양가: 청약 당첨 시 납부 금액. 상세 내용은 공고문을 확인하세요.">
-                <span className="text-blue-400 font-normal cursor-help text-xs" aria-label="도움말">분양가 ⓘ</span>
-              </Tooltip>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-xs text-gray-500 border-b border-gray-100">
-                    <th className="text-left pb-2 font-medium">전용면적</th>
-                    <th className="text-right pb-2 font-medium">세대수</th>
-                    <th className="text-right pb-2 font-medium">분양가</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {houseTypes.map((ht, idx) => (
-                    <tr key={idx} className="py-2">
-                      <td className="py-2.5 text-gray-800 font-medium">{ht.houseTypeName}</td>
-                      <td className="py-2.5 text-right text-gray-700">{ht.supplyCount.toLocaleString()}세대</td>
-                      <td className="py-2.5 text-right text-gray-700">{ht.priceDisplay}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
         {/* 내 청약 분석 */}
-        {scoreData && hasMatchInfo && (
+        {scoreData && (
           <div className="bg-blue-50 rounded-2xl border border-blue-100 p-5 mb-4">
             <div className="flex items-center gap-2 mb-3">
               <h2 className="text-sm font-bold text-blue-800">내 청약 분석</h2>
@@ -253,22 +151,9 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
                 <span className="text-blue-400 font-normal text-xs cursor-help" aria-label="도움말">가점제·추첨제 ⓘ</span>
               </Tooltip>
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              {tierLabel && (
-                <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${tierLabel.style}`}>
-                  {tierLabel.text}
-                </span>
-              )}
-              {generalSupply && !generalSupply.eligible && (
-                <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-red-50 text-red-500">
-                  {generalSupply.text}
-                </span>
-              )}
-              {specialLabels.map((label) => (
-                <span key={label} className="text-xs px-2.5 py-1 rounded-full font-semibold bg-purple-100 text-purple-700">
-                  {label}
-                </span>
-              ))}
+            <CompetitionSummary announcement={announcement} scoreData={scoreData} />
+            <div className="mt-3">
+              <SpecialSupplyChips announcement={announcement} scoreData={scoreData} />
             </div>
             {scoreData && (
               <p className="text-xs text-blue-600 mt-2">
