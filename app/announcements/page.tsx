@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import Disclaimer from '@/components/Disclaimer';
 import { BottomSheet } from '@/components/ui/BottomSheet';
@@ -14,8 +15,12 @@ import Tooltip from '@/components/Tooltip';
 import { TERM_MAP } from '@/lib/terms';
 import { CopyButton } from '@/components/ui/CopyButton';
 import { getMapSearchUrl } from '@/lib/maps';
+import { KAKAO_JS_KEY } from '@/lib/kakaoMaps';
 import { readLocalStorage } from '@/hooks/useLocalStorage';
 import { LAST_SCORE_KEY, isEligibilityInput, parseSavedScore, toStoredScoreData } from '@/lib/scoreStorage';
+
+const AnnouncementMap = dynamic(() => import('@/components/announcements/AnnouncementMap'), { ssr: false });
+const MAP_ENABLED = !!KAKAO_JS_KEY;
 
 const REGION_OPTIONS = [
   '전체',
@@ -81,7 +86,7 @@ export default function AnnouncementsPage() {
   const [hideExpired, setHideExpired] = useState(true);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
   const [sessionUser, setSessionUser] = useState<SessionUser | null | undefined>(undefined);
-  const [activeTab, setActiveTab] = useState<'all' | 'favorites'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'favorites' | 'map'>('all');
   const [scoreFromDB, setScoreFromDB] = useState(false);
 
   const authReady = sessionUser !== undefined;
@@ -160,9 +165,11 @@ export default function AnnouncementsPage() {
     fetchData();
   }, [selectedRegion]);
 
-  const baseAnnouncements = hideExpired
-    ? announcements.filter(a => a.status !== '마감')
-    : announcements;
+  // 지도 탭이 다시 그려질 때 범위가 초기화되지 않도록 배열을 고정한다
+  const baseAnnouncements = useMemo(
+    () => (hideExpired ? announcements.filter((a) => a.status !== '마감') : announcements),
+    [announcements, hideExpired],
+  );
 
   const filteredAnnouncements = activeTab === 'favorites'
     ? baseAnnouncements.filter(a => favoriteIds.includes(a.id))
@@ -284,6 +291,14 @@ export default function AnnouncementsPage() {
           >
             <span>♥</span> 즐겨찾기 {favoriteIds.length > 0 && <span className={`text-xs px-1.5 py-0.5 rounded-full ${activeTab === 'favorites' ? 'bg-white/20' : 'bg-red-100 text-red-500'}`}>{favoriteIds.length}</span>}
           </button>
+          {MAP_ENABLED && (
+            <button
+              onClick={() => setActiveTab('map')}
+              className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-1 ${activeTab === 'map' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}
+            >
+              <span aria-hidden>🗺</span> 지도
+            </button>
+          )}
         </div>
 
         {/* Region Filter & Expired Toggle */}
@@ -339,8 +354,15 @@ export default function AnnouncementsPage() {
           </div>
         )}
 
-        {/* Announcements List */}
-        {loading ? (
+        {/* Announcements Map / List */}
+        {activeTab === 'map' && !loading ? (
+          <AnnouncementMap
+            key={selectedRegion}
+            region={selectedRegion}
+            announcements={baseAnnouncements}
+            onOpenDetail={setSelectedAnnouncement}
+          />
+        ) : loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((n) => (
               <div
@@ -389,7 +411,7 @@ export default function AnnouncementsPage() {
         )}
 
         {/* Total count */}
-        {!loading && filteredAnnouncements.length > 0 && (
+        {!loading && activeTab !== 'map' && filteredAnnouncements.length > 0 && (
           <p className="text-xs text-gray-400 text-center mt-4">
             총 {filteredAnnouncements.length}건의 공고
           </p>

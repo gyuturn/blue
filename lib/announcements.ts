@@ -582,3 +582,22 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
     regulation: { speculationOverheated: false, adjustedArea: false, priceCap: false },
   },
 ];
+
+// 목록·좌표 API가 함께 쓰는 공고 조회: 실데이터 → 실패 시 샘플 데이터, 접수 상태 보정
+export async function loadAnnouncements(region?: string): Promise<{ announcements: Announcement[]; isMock: boolean }> {
+  const apiData = await fetchAnnouncementsFromAPI(region);
+  const isMock = apiData.length === 0;
+  const source = isMock
+    ? region
+      ? MOCK_ANNOUNCEMENTS.filter((a) => a.region.includes(region))
+      : MOCK_ANNOUNCEMENTS
+    : apiData;
+
+  const announcements = source.map((a) => {
+    if (a.status) return a;
+    const computed = getSubscriptionStatus(a.subscriptionStartDate, a.subscriptionEndDate);
+    return { ...a, status: computed === '일정미정' ? undefined : computed };
+  });
+
+  return { announcements, isMock };
+}
