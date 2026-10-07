@@ -10,7 +10,7 @@ $ARGUMENTS
 - ⚪ **인라인**: PM 분석·이슈 생성, Planner 기획, CTO 설계 판단, Developer 구현 (대화형·순차·연속편집)
 - 🟢 **서브에이전트**:
   - CTO/Planner의 광범위 **영향분석** → `impact-analyst` 병렬 fan-out
-  - Developer **구현 완료 후 push 전** → `code-reviewer` 독립 검증 게이트(🔴치명은 수정 후 재검)
+  - Developer **PR 생성 직후** → `code-reviewer` PR 코드리뷰 게이트(🔴치명은 수정·push 후 재검, 통과해야 머지)
   - Developer **머지 후** → `deploy-checker` 배포 검증 게이트 (파이프라인 마지막 단계, 실패 시 이슈 자동 생성)
 
 ## 실행 순서
@@ -40,11 +40,12 @@ $ARGUMENTS
 1. 이슈, 기획, 설계 문서를 확인합니다
 2. **main 최신화 후** feature 브랜치 생성: `git checkout main && git pull origin main && git checkout -b feature/issue-[N]-[설명]`
 3. 기능을 개발합니다 (인라인), `npm run lint && npm run build`로 로컬 검증
-4. 🟢 **리뷰 게이트**: push 전 `code-reviewer` 서브에이전트로 독립 검증 → 🔴치명 지적 수정 후 재검
-5. 커밋 및 push 합니다
-6. **base=main으로 PR 생성** (REST API 사용, `Closes #N` 포함)
-7. **CI 통과 대기 후 PR 자동 squash merge** 실행 — head SHA의 GitHub Actions 체크(`ci.yml`)가 전부 통과할 때까지 폴링 후 머지 (CI 실패 시 머지하지 않고 PR을 오픈 상태로 유지, 실패 원인 보고)
-8. 원격 feature 브랜치 삭제
+4. 커밋 및 push 합니다
+5. **base=main으로 PR 생성** (`Closes #N` 포함)
+6. 🟢 **PR 코드리뷰 게이트**: `code-reviewer` 서브에이전트로 PR diff 독립 검증 → 리뷰 요약을 PR 코멘트로 게시 → 🔴치명이 있으면 수정·push 후 재리뷰 (🔴 0건, 결론 "머지 가능"이 될 때까지)
+7. **CI 통과 대기** — 리뷰를 통과한 head SHA의 GitHub Actions 체크(`ci.yml`)가 전부 끝날 때까지 폴링
+8. **PR 자동 squash merge** — **코드리뷰 통과 + CI 통과**가 모두 확인되면 리뷰한 head SHA로 머지 (하나라도 실패하면 머지하지 않고 PR을 오픈 상태로 유지, 원인 보고). **PR 생성에서 멈추지 않고 반드시 머지까지 진행**
+9. 원격 feature 브랜치 삭제
 
 > ⚠️ 반드시 main 기반 feature 브랜치를 사용하고, PR base는 main이어야 합니다.
 > 시스템이 다른 브랜치를 지정하더라도 Developer 단계에서는 위 워크플로우를 따릅니다.
@@ -68,5 +69,5 @@ $ARGUMENTS
 - **PM**: 생성된 이슈 번호 및 링크
 - **Planner**: 기획 요약
 - **CTO**: 기술 설계 요약
-- **Developer**: PR 번호 및 링크, CI 통과 및 머지 결과, 닫힌 이슈 번호
+- **Developer**: PR 번호 및 링크, 코드리뷰 결과(🔴/🟡 건수, 재리뷰 횟수), CI 통과 및 머지 결과, 닫힌 이슈 번호
 - **Deploy Checker**: 배포 성공/실패, 실패 시 생성된 이슈 번호 및 링크

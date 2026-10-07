@@ -50,7 +50,7 @@
 | `/pm` | 요구사항 분석 + GitHub 이슈 생성 |
 | `/planner` | UI/UX 기획 (Next.js + Tailwind 기준) |
 | `/cto` | 기술 검토 + 설계 문서 작성 (`docs/technical/`, `docs/architecture/`) |
-| `/developer` | 브랜치 생성 + 개발 + 리뷰 게이트 + **CI 통과 시 자동 squash merge** + 배포 검증 |
+| `/developer` | 브랜치 생성 + 개발 + PR 생성 + PR 코드리뷰 게이트 + **리뷰·CI 통과 시 자동 squash merge** + 배포 검증 |
 | `/feature [요구사항]` | PM → Planner → CTO → Developer → Deploy Checker 전체 파이프라인 자동 실행 |
 | `/dashboard` | 이슈/PR/Git/배포 현황 대시보드 (`dashboard.sh`) |
 
@@ -58,11 +58,11 @@
 
 | 서브에이전트 | 호출 지점 | 역할 |
 |---|---|---|
-| `code-reviewer` | Developer가 push하기 직전 | fresh context로 diff 독립 검증, [치명/권고/무시] 반환. 청약 가점 계산 정확도·특별공급 자격 회귀 최우선 점검 |
+| `code-reviewer` | Developer가 PR을 생성한 직후 | fresh context로 PR diff 독립 검증, [치명/권고/무시] 반환(PR 코멘트로 게시). 🔴 0건이어야 머지 진행. 청약 가점 계산 정확도·특별공급 자격 회귀 최우선 점검 |
 | `impact-analyst` | CTO/Planner 설계 시 영향 범위가 넓을 때 | 영역별 병렬 fan-out으로 영향 파일·리스크 요약만 반환 |
 | `deploy-checker` | Developer가 PR을 머지한 직후 | `cd.yml`(Vercel 배포) 결과 폴링 확인, 실패 시 GitHub 이슈 자동 생성 |
 
-> ⚠️ `/developer`는 CI(`ci.yml`) 통과 시 **PR을 자동으로 squash merge**한다. 자동 머지를 원치 않으면 해당 세션에서 명시적으로 "머지는 직접 할게" 등으로 알려줄 것.
+> ⚠️ `/developer`(및 `/feature`)는 PR 생성 후 **코드리뷰(🔴 0건) + CI(`ci.yml`) 통과 시 PR을 자동으로 squash merge**한다. 자동 머지를 원치 않으면 해당 세션에서 명시적으로 "머지는 직접 할게" 등으로 알려줄 것.
 
 ---
 

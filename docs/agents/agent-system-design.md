@@ -23,7 +23,7 @@ Blue의 `.claude/` 구성은 개인 프로젝트 [`gyuturn/stock`](https://githu
 ### 진짜 서브에이전트 (frontmatter + 위임)
 | 에이전트 | 도구 | 이점 | 호출 지점 |
 |----------|------|------|-----------|
-| **code-reviewer** | Read/Grep/Glob/Bash (read-only) | 독립 검증 + 도구 스코핑 | Developer 구현 완료 후 push 전 |
+| **code-reviewer** | Read/Grep/Glob/Bash (read-only) | 독립 검증 + 도구 스코핑 | Developer PR 생성 직후 (머지 게이트) |
 | **impact-analyst** | Read/Grep/Glob/Bash (read-only) | 병렬 fan-out + 컨텍스트 격리 | CTO 설계 / Planner 기획 시 영향분석 |
 | **deploy-checker** | Bash (read-only, 이슈 생성만 예외) | 독립 검증 + 도구 스코핑 | Developer PR 머지 후, 파이프라인 마지막 단계 |
 
@@ -32,20 +32,21 @@ Blue의 `.claude/` 구성은 개인 프로젝트 [`gyuturn/stock`](https://githu
 ```
 PM(인라인) → Planner(인라인, 필요시 impact-analyst 병렬)
    → CTO(인라인 설계, 영향분석은 impact-analyst 병렬 fan-out)
-   → Developer(인라인 구현)
-   → 🟢 code-reviewer 게이트(독립 검증, 🔴치명 수정 후 재검)
-   → PR → CI(ci.yml) 통과 대기 → squash merge
+   → Developer(인라인 구현) → push → PR 생성
+   → 🟢 code-reviewer PR 리뷰 게이트(독립 검증, PR 코멘트 게시, 🔴치명 수정·push 후 재검)
+   → CI(ci.yml) 통과 대기 → 리뷰·CI 모두 통과 시 squash merge
    → 🟢 deploy-checker 게이트(배포 검증, 실패 시 이슈 자동 생성)
 ```
 
 ### 리뷰 게이트 상세
-- Developer가 구현·로컬 검증(`npm run lint && npm run build`) 후 **push 전** `Task(subagent_type="code-reviewer")` 호출
-- 리뷰어는 `git diff origin/main...HEAD`를 fresh context로 검증 → [🔴치명/🟡권고/⚪무시] 요약 반환
-- 🔴치명 있으면 수정 후 재검, 통과 시 push→PR
+- Developer가 구현·로컬 검증(`npm run lint && npm run build`) 후 push → PR 생성, **PR 생성 직후** `Task(subagent_type="code-reviewer", input=PR번호)` 호출
+- 리뷰어는 PR diff(`git diff origin/main...HEAD`)를 fresh context로 검증 → [🔴치명/🟡권고/⚪무시] 요약 반환, Developer가 이를 PR 코멘트로 게시
+- 🔴치명 있으면 수정·push 후 재검(리뷰 이후 새 커밋이 올라오면 이전 리뷰는 무효), 🔴 0건이 되어야 머지 단계로 진행
 - Blue 특성상 **청약 가점 계산 정확도·특별공급 자격 판정 회귀·표시(포맷) vs 계산 로직 분리**를 최우선 점검 (과거 #72/#73, #56에서 실제로 발생한 버그 유형)
 
 ### PR 머지 & 배포 검증 상세
-- PR 생성 후 **CI(`ci.yml`) 통과를 폴링으로 대기**한 뒤에만 squash merge (CI 실패 시 머지하지 않고 PR 오픈 상태로 원인 보고)
+- 머지 조건 = **코드리뷰 통과(🔴 0건) AND CI(`ci.yml`) 통과**. 리뷰한 head SHA로 CI를 폴링 대기한 뒤, 같은 SHA를 고정(`sha` 파라미터)해 squash merge — 리뷰 이후 새 커밋이 있으면 머지가 거부되어 리뷰부터 다시 수행
+- 조건 중 하나라도 실패하면 머지하지 않고 PR 오픈 상태로 원인 보고. 파이프라인은 PR 생성에서 멈추지 않고 머지까지 진행한다(`gh`가 없는 클라우드 세션에서는 GitHub MCP 도구로 동일 수행)
 - 머지 커밋 SHA로 `Task(subagent_type="deploy-checker")` 호출 → `cd.yml`(Deploy to Vercel) run 완료까지 폴링
 - 배포 성공 시 결과만 보고, **배포 실패 시 실패 job 로그를 근거로 GitHub 이슈를 자동 생성**(`deploy-failure` 라벨)
 - 머지 성공 ≠ 배포 성공(env 동기화 실패·빌드 실패로 `cd.yml`이 별도로 실패 가능)이라는 점이 이 게이트의 존재 이유
@@ -56,4 +57,4 @@ PM(인라인) → Planner(인라인, 필요시 impact-analyst 병렬)
 - 테스트 러너 미도입 상태를 명시 — 계산 로직 변경 시 code-reviewer 게이트에서 수동 검증 근거로 대체, 필요 시 별도 이슈로 테스트 프레임워크 도입 제안
 
 ## 기대 효과
-"에이전트 = 프롬프트 템플릿"에서 → **이점이 검증된 지점에만 진짜 서브에이전트가 뜨는 구조**로. 리뷰 게이트로 가점 계산 회귀를 push 전에 잡고, 영향분석 병렬화로 설계 근거를 빠르게 확보한다. 나머지는 인라인이라 토큰·속도 낭비가 없다.
+"에이전트 = 프롬프트 템플릿"에서 → **이점이 검증된 지점에만 진짜 서브에이전트가 뜨는 구조**로. PR 리뷰 게이트로 가점 계산 회귀를 머지 전에 잡고, 영향분석 병렬화로 설계 근거를 빠르게 확보한다. 나머지는 인라인이라 토큰·속도 낭비가 없다.
