@@ -583,6 +583,18 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
   },
 ];
 
+// 목록·좌표 API 응답의 CDN 캐시 정책 (#115)
+// 청약홈 분양정보 API는 공고 등록 시 수시 반영(하루 몇 건)되고 공고→접수까지 1~2주 여유가 있어 30분+30분(stale)이면 충분하다.
+// 샘플 데이터·부분 결과(isFallback)는 외부 API 일시 장애의 결과라 1분만 캐시해 복구가 빨리 반영되게 한다.
+export const ANNOUNCEMENTS_CACHE_SECONDS = 1800;
+export const ANNOUNCEMENTS_STALE_SECONDS = 1800;
+export const ANNOUNCEMENTS_FALLBACK_CACHE_SECONDS = 60;
+
+export function getAnnouncementsCacheControl(isFallback: boolean): string {
+  if (isFallback) return `public, s-maxage=${ANNOUNCEMENTS_FALLBACK_CACHE_SECONDS}`;
+  return `public, s-maxage=${ANNOUNCEMENTS_CACHE_SECONDS}, stale-while-revalidate=${ANNOUNCEMENTS_STALE_SECONDS}`;
+}
+
 // 목록·좌표 API가 함께 쓰는 공고 조회: 실데이터 → 실패 시 샘플 데이터, 접수 상태 보정
 export async function loadAnnouncements(region?: string): Promise<{ announcements: Announcement[]; isMock: boolean }> {
   const apiData = await fetchAnnouncementsFromAPI(region);
