@@ -17,31 +17,11 @@ import { CopyButton } from '@/components/ui/CopyButton';
 import { getMapSearchUrl } from '@/lib/maps';
 import { KAKAO_JS_KEY } from '@/lib/kakaoMaps';
 import { readLocalStorage } from '@/hooks/useLocalStorage';
+import { INITIAL_REGION, LEGACY_REGION_KEY, REGION_OPTIONS, getRegionQuery } from '@/lib/regions';
 import { LAST_SCORE_KEY, isEligibilityInput, parseSavedScore, toStoredScoreData } from '@/lib/scoreStorage';
 
 const AnnouncementMap = dynamic(() => import('@/components/announcements/AnnouncementMap'), { ssr: false });
 const MAP_ENABLED = !!KAKAO_JS_KEY;
-
-const REGION_OPTIONS = [
-  '전체',
-  '서울특별시',
-  '경기도',
-  '인천광역시',
-  '부산광역시',
-  '대구광역시',
-  '광주광역시',
-  '대전광역시',
-  '울산광역시',
-  '세종특별자치시',
-  '강원특별자치도',
-  '충청북도',
-  '충청남도',
-  '전북특별자치도',
-  '전라남도',
-  '경상북도',
-  '경상남도',
-  '제주특별자치도',
-];
 
 function formatPriceKorean(raw: string): string {
   const num = parseInt(raw.replace(/,/g, ''), 10);
@@ -76,11 +56,14 @@ export default function AnnouncementsPage() {
   const [authChecked, setAuthChecked] = useState(false);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedRegion, setSelectedRegion] = useState('전체');
+  const [selectedRegion, setSelectedRegion] = useState(INITIAL_REGION);
 
   useEffect(() => {
-    const saved = localStorage.getItem('preferred_region');
-    if (saved && REGION_OPTIONS.includes(saved)) setSelectedRegion(saved);
+    try {
+      localStorage.removeItem(LEGACY_REGION_KEY);
+    } catch {
+      // 저장소 접근이 막힌 환경은 무시
+    }
   }, []);
   const [isMock, setIsMock] = useState(false);
   const [hideExpired, setHideExpired] = useState(true);
@@ -150,9 +133,7 @@ export default function AnnouncementsPage() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const regionParam =
-          selectedRegion === '전체' ? '' : `?region=${encodeURIComponent(selectedRegion)}`;
-        const res = await fetch(`/api/announcements${regionParam}`);
+        const res = await fetch(`/api/announcements${getRegionQuery(selectedRegion)}`);
         const json = await res.json();
         setAnnouncements(json.data ?? []);
         setIsMock(json.isMock ?? false);
@@ -319,10 +300,7 @@ export default function AnnouncementsPage() {
             {REGION_OPTIONS.map((region) => (
               <button
                 key={region}
-                onClick={() => {
-                  setSelectedRegion(region);
-                  localStorage.setItem('preferred_region', region);
-                }}
+                onClick={() => setSelectedRegion(region)}
                 className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   selectedRegion === region
                     ? 'bg-blue-600 text-white shadow-sm'

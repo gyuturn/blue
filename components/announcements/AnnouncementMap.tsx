@@ -6,6 +6,7 @@ import type { LatLng } from '@/lib/geocode';
 import { getDday, getDdayBadgeStyle } from '@/lib/announcements';
 import { loadKakaoMaps } from '@/lib/kakaoMaps';
 import type { KakaoMap, KakaoMapsApi } from '@/lib/kakaoMaps';
+import { getRegionQuery } from '@/lib/regions';
 
 interface AnnouncementMapProps {
   region: string; // 바뀌면 부모가 key로 다시 마운트한다
@@ -57,8 +58,7 @@ export default function AnnouncementMap({ region, announcements, onOpenDetail }:
   // 좌표 조회 (지역이 바뀌면 key로 다시 마운트되므로 초기 상태가 loading)
   useEffect(() => {
     let cancelled = false;
-    const param = region === '전체' ? '' : `?region=${encodeURIComponent(region)}`;
-    fetch(`/api/announcements/coords${param}`)
+    fetch(`/api/announcements/coords${getRegionQuery(region)}`)
       .then((r) => r.json())
       .then((json) => {
         if (cancelled) return;
