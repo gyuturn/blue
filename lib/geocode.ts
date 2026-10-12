@@ -95,11 +95,12 @@ export async function geocodeAddress(address: string, restKey: string, region?: 
 }
 
 // 공고 여러 건을 동시 요청 수를 제한해 변환한다.
+// 키 오류·쿼터 초과로 중단되면 complete=false — 호출부가 부분 결과를 오래 캐시하지 않도록 알린다.
 export async function geocodeMany<T extends { id: string; address?: string; region?: string }>(
   items: T[],
   restKey: string,
   concurrency = 5,
-): Promise<Record<string, LatLng>> {
+): Promise<{ data: Record<string, LatLng>; complete: boolean }> {
   const result: Record<string, LatLng> = {};
   const targets = items.filter((item) => item.address);
   try {
@@ -114,6 +115,7 @@ export async function geocodeMany<T extends { id: string; address?: string; regi
   } catch (error) {
     if (!(error instanceof KakaoAuthError)) throw error;
     console.error('[geocode] 카카오 키 오류 또는 쿼터 초과로 중단:', error.message);
+    return { data: result, complete: false };
   }
-  return result;
+  return { data: result, complete: true };
 }

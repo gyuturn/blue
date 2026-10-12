@@ -94,5 +94,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/auth).*)'],
+  // api/announcements*(공개·무인증 API 전용 접두사): CDN 공개 캐시 응답에 토큰 갱신 Set-Cookie가 섞이지 않도록 제외 (#115)
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/auth|api/announcements).*)'],
 };
