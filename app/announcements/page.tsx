@@ -57,6 +57,12 @@ export default function AnnouncementsPage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRegion, setSelectedRegion] = useState(INITIAL_REGION);
+  const [isMock, setIsMock] = useState(false);
+  const [hideExpired, setHideExpired] = useState(true);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
+  const [sessionUser, setSessionUser] = useState<SessionUser | null | undefined>(undefined);
+  const [activeTab, setActiveTab] = useState<'all' | 'favorites' | 'map'>('all');
+  const [scoreFromDB, setScoreFromDB] = useState(false);
 
   useEffect(() => {
     try {
@@ -65,12 +71,6 @@ export default function AnnouncementsPage() {
       // 저장소 접근이 막힌 환경은 무시
     }
   }, []);
-  const [isMock, setIsMock] = useState(false);
-  const [hideExpired, setHideExpired] = useState(true);
-  const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
-  const [sessionUser, setSessionUser] = useState<SessionUser | null | undefined>(undefined);
-  const [activeTab, setActiveTab] = useState<'all' | 'favorites' | 'map'>('all');
-  const [scoreFromDB, setScoreFromDB] = useState(false);
 
   const authReady = sessionUser !== undefined;
   const { favoriteIds, toggle: toggleFavorite } = useFavorites(authReady ? !!sessionUser : null);
