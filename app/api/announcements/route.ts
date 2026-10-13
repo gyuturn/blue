@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { loadAnnouncements } from '@/lib/announcements';
-
-export const revalidate = 3600;
+import { getAnnouncementsCacheControl, loadAnnouncements } from '@/lib/announcements';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -13,9 +11,12 @@ export async function GET(request: Request) {
   // status 쿼리 필터 적용
   const announcements = statusFilter ? all.filter((a) => a.status === statusFilter) : all;
 
-  return NextResponse.json({
-    data: announcements,
-    total: announcements.length,
-    isMock,
-  });
+  return NextResponse.json(
+    {
+      data: announcements,
+      total: announcements.length,
+      isMock,
+    },
+    { headers: { 'Cache-Control': getAnnouncementsCacheControl(isMock) } },
+  );
 }
