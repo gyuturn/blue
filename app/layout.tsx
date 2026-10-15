@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "./globals.css";
 import Header from "@/components/layout/Header";
+import { deviceScoreRedirectScript } from "@/lib/home";
+import { LAST_SCORE_KEY } from "@/lib/scoreStorage";
 
 export const metadata: Metadata = {
   title: {
@@ -41,6 +43,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
+      <head>
+        {/* 기기에 점수가 저장된 사용자는 소개 화면이 그려지기 전에 공고목록으로 (#117) */}
+        <script dangerouslySetInnerHTML={{ __html: deviceScoreRedirectScript(LAST_SCORE_KEY) }} />
+      </head>
       <body
         className="font-sans antialiased"
       >
