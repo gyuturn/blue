@@ -6,3 +6,26 @@ export function shouldShowAnnouncementsAsHome(
 ): boolean {
   return isLoggedIn && !!server?.ok && server.record != null;
 }
+
+export const ANNOUNCEMENTS_HOME = '/announcements';
+
+// 이 기기에 저장된 점수가 있는지 (scoreStorage의 SavedScoreRecord 형태) — 메인 이동 판정 전용.
+// 아래 인라인 스크립트와 같은 규칙이어야 한다 (tests/home.test.ts가 두 구현을 같은 입력으로 검증)
+export function hasDeviceScore(raw: string | null): boolean {
+  if (!raw) return false;
+  try {
+    const p = JSON.parse(raw);
+    return !!p && typeof p === 'object' && p.v === 1 && typeof p.savedAt === 'number' && !!p.input && typeof p.input === 'object';
+  } catch {
+    return false;
+  }
+}
+
+// 새로고침·PWA 실행처럼 문서를 새로 받을 때, 소개 화면이 그려지기 전에 공고목록으로 보낸다 (#117)
+export function deviceScoreRedirectScript(storageKey: string): string {
+  return (
+    `try{if(location.pathname==='/'){var p=JSON.parse(localStorage.getItem(${JSON.stringify(storageKey)})||'null');` +
+    `if(p&&typeof p==='object'&&p.v===1&&typeof p.savedAt==='number'&&p.input&&typeof p.input==='object')` +
+    `location.replace(${JSON.stringify(ANNOUNCEMENTS_HOME)})}}catch(e){}`
+  );
+}

@@ -16,7 +16,8 @@ import { TERM_MAP } from '@/lib/terms';
 import { CopyButton } from '@/components/ui/CopyButton';
 import { getMapSearchUrl } from '@/lib/maps';
 import { KAKAO_JS_KEY } from '@/lib/kakaoMaps';
-import { readLocalStorage } from '@/hooks/useLocalStorage';
+import { readLocalStorage, useLocalStorageItem } from '@/hooks/useLocalStorage';
+import { hasDeviceScore } from '@/lib/home';
 import { INITIAL_REGION, LEGACY_REGION_KEY, REGION_OPTIONS, getRegionQuery } from '@/lib/regions';
 import { LAST_SCORE_KEY, isEligibilityInput, parseSavedScore, toStoredScoreData } from '@/lib/scoreStorage';
 
@@ -63,6 +64,9 @@ export default function AnnouncementsPage() {
   const [sessionUser, setSessionUser] = useState<SessionUser | null | undefined>(undefined);
   const [activeTab, setActiveTab] = useState<'all' | 'favorites' | 'map'>('all');
   const [scoreFromDB, setScoreFromDB] = useState(false);
+  const [lastScoreRaw] = useLocalStorageItem(LAST_SCORE_KEY);
+  // 점수가 저장된 사용자에게는 메인(/)이 곧 이 화면이라 "홈으로"가 제자리로 돌아온다 (#111, #117)
+  const showHomeButton = !scoreData && !hasDeviceScore(lastScoreRaw);
 
   useEffect(() => {
     try {
@@ -169,25 +173,27 @@ export default function AnnouncementsPage() {
       <div className="max-w-md mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-6">
-          <button
-            onClick={() => router.push('/')}
-            className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm mb-4"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          {showHomeButton && (
+            <button
+              onClick={() => router.push('/')}
+              className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm mb-4"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
-            홈으로
-          </button>
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+              홈으로
+            </button>
+          )}
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">청약 공고</h1>

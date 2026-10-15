@@ -1,12 +1,13 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import Disclaimer from '@/components/Disclaimer';
+import DeviceScoreRedirect from '@/components/home/DeviceScoreRedirect';
 import LastScoreCard from '@/components/home/LastScoreCard';
 import { getSession } from '@/lib/auth/session';
 import { db, describeDbError } from '@/lib/db';
 import { subscriptionScores } from '@/lib/db/schema';
 import { isEligibilityInput } from '@/lib/scoreStorage';
-import { shouldShowAnnouncementsAsHome } from '@/lib/home';
+import { ANNOUNCEMENTS_HOME, shouldShowAnnouncementsAsHome } from '@/lib/home';
 import { eq, desc } from 'drizzle-orm';
 import type { EligibilityInput } from '@/types';
 
@@ -47,10 +48,12 @@ export default async function HomePage() {
   const server = session ? await getLatestServerRecord(session.id) : null;
 
   // 이미 점수를 계정에 저장한 사용자에게는 소개 화면 대신 공고목록이 메인이다
-  if (shouldShowAnnouncementsAsHome(!!session, server)) redirect('/announcements');
+  if (shouldShowAnnouncementsAsHome(!!session, server)) redirect(ANNOUNCEMENTS_HOME);
 
   return (
     <main className="min-h-screen bg-white">
+      {/* 이 기기에 저장된 점수가 있어도 메인은 공고목록이다 (#117) */}
+      <DeviceScoreRedirect />
       <div className="max-w-md mx-auto px-5 pt-8">
         <LastScoreCard
           isLoggedIn={!!session}
