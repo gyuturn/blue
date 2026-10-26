@@ -20,6 +20,7 @@ import { readLocalStorage, useLocalStorageItem } from '@/hooks/useLocalStorage';
 import { hasDeviceScore } from '@/lib/home';
 import { INITIAL_REGION, LEGACY_REGION_KEY, REGION_OPTIONS, getRegionQuery } from '@/lib/regions';
 import { LAST_SCORE_KEY, isEligibilityInput, parseSavedScore, toStoredScoreData } from '@/lib/scoreStorage';
+import { parseUnitArea, type MarketEstimate } from '@/lib/marketPrice';
 
 const AnnouncementMap = dynamic(() => import('@/components/announcements/AnnouncementMap'), { ssr: false });
 const MAP_ENABLED = !!KAKAO_JS_KEY;
@@ -601,6 +602,7 @@ function AnnouncementDetail({ announcement, scoreData }: { announcement: Announc
 
   // 목록 API 주소가 없으면 청약홈 상세의 위치로 대체
   const address = announcement.address ?? detail?.location;
+  const market = useMarketPrices(announcement.id, announcement.pblancNo ?? announcement.id, !!detail?.units.length);
 
   // 공고가 바뀌면 key로 다시 마운트되므로 로딩 상태 초기화가 필요 없다
   useEffect(() => {
@@ -710,6 +712,7 @@ function AnnouncementDetail({ announcement, scoreData }: { announcement: Announc
               <div className="mt-3 space-y-2">
                 {detail.units.map((u, i) => {
                   const areaText = formatAreaWithPyeong(u.type);
+                  const area = parseUnitArea(u.type);
                   return (
                   <div key={i} className="rounded-xl border border-gray-100 bg-white px-3 py-2.5">
                     <p className="text-xs font-semibold text-gray-800 mb-1">{u.type}</p>
@@ -718,6 +721,13 @@ function AnnouncementDetail({ announcement, scoreData }: { announcement: Announc
                       <span>세대수 <span className="font-medium text-gray-800">{u.totalCount || '-'}</span></span>
                       <span>분양가 <span className="font-medium text-gray-800">{u.price ? formatPriceKorean(u.price) : '-'}</span></span>
                     </div>
+                    {area !== null && market.status !== 'off' && (
+                      <MarketPriceRow
+                        loading={market.status === 'loading'}
+                        estimate={market.data[String(area)]}
+                        price={u.price}
+                      />
+                    )}
                   </div>
                   );
                 })}
@@ -739,6 +749,69 @@ function AnnouncementDetail({ announcement, scoreData }: { announcement: Announc
         </svg>
         청약홈에서 직접 보기
       </a>
+    </div>
+  );
+}
+
+type MarketState = { status: 'loading' | 'ready' | 'off'; data: Record<string, MarketEstimate | null> };
+
+// 주택형 전용면적별 주변 실거래 시세. 키 없음·오류면 'off'로 화면에서 숨긴다.
+function useMarketPrices(houseManageNo: string, pblancNo: string, enabled: boolean): MarketState {
+  const key = enabled ? `${houseManageNo}|${pblancNo}` : '';
+  const [result, setResult] = useState<{ key: string; state: MarketState } | null>(null);
+
+  useEffect(() => {
+    if (!key) return;
+    let cancelled = false;
+    const params = new URLSearchParams({ houseManageNo, pblancNo });
+    fetch(`/api/announcements/market-price?${params.toString()}`)
+      .then((r) => r.json())
+      .then((json) => {
+        if (cancelled) return;
+        const state: MarketState = json.enabled && json.data ? { status: 'ready', data: json.data } : { status: 'off', data: {} };
+        setResult({ key, state });
+      })
+      .catch(() => !cancelled && setResult({ key, state: { status: 'off', data: {} } }));
+    return () => {
+      cancelled = true;
+    };
+  }, [key, houseManageNo, pblancNo]);
+
+  if (!key) return { status: 'off', data: {} };
+  return result?.key === key ? result.state : { status: 'loading', data: {} };
+}
+
+function MarketPriceRow({ loading, estimate, price }: { loading: boolean; estimate: MarketEstimate | null | undefined; price?: string }) {
+  if (loading) return <div className="mt-2 h-8 rounded-lg bg-gray-100 animate-pulse" />;
+  if (estimate === undefined) return null;
+  if (estimate === null) {
+    return <p className="mt-2 text-xs text-gray-400">주변에 비교할 거래가 부족해요</p>;
+  }
+
+  const supply = price ? parseInt(price.replace(/,/g, ''), 10) : NaN;
+  const diff = supply > 0 ? estimate.estimate - supply : null;
+  const similar = diff !== null && Math.abs(diff) <= estimate.estimate * 0.03;
+  const basis = `${estimate.dong ?? '같은 시군구'} ${estimate.newOnly ? '10년 이내 ' : ''}아파트 · 최근 ${estimate.months}개월 ${estimate.count}건`;
+
+  return (
+    <div className="mt-2 rounded-lg bg-gray-50 px-2.5 py-2 text-xs">
+      <p className="text-gray-600">
+        <Tooltip
+          term="주변 시세"
+          definition="국토교통부 실거래가 기준, 비슷한 면적(±5㎡) 거래의 ㎡당 가격 중위값으로 환산한 참고용 시세예요. 실제 시세·향후 가격과 다를 수 있어요."
+        >
+          주변 시세
+        </Tooltip>{' '}
+        <span className="font-semibold text-gray-900">약 {formatPriceKorean(String(estimate.estimate))}</span>
+      </p>
+      {diff !== null && (
+        <p className={`font-medium mt-0.5 ${similar ? 'text-gray-600' : diff > 0 ? 'text-green-600' : 'text-red-600'}`}>
+          {similar
+            ? '분양가가 주변 시세와 비슷해요'
+            : `분양가가 약 ${formatPriceKorean(String(Math.abs(diff)))} ${diff > 0 ? '낮아요 ↓' : '높아요 ↑'}`}
+        </p>
+      )}
+      <p className="text-gray-400 mt-0.5">{basis}</p>
     </div>
   );
 }
