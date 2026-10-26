@@ -204,6 +204,27 @@ async function withSpecialSupplyCounts(apiKey: string, announcements: Announceme
   }
 }
 
+// 공고번호로 공급위치(주소) 조회 — 청약홈 상세 스크래핑에서 주소를 못 얻을 때 사용
+export async function fetchAnnouncementAddress(houseManageNo: string): Promise<string | undefined> {
+  const apiKey = process.env.PUBLIC_DATA_API_KEY;
+  if (!apiKey) return undefined;
+  try {
+    const baseUrl = 'https://api.odcloud.kr/api/ApplyhomeInfoDetailSvc/v1/getAPTLttotPblancDetail';
+    const queryParams = new URLSearchParams({ page: '1', perPage: '1', returnType: 'JSON' });
+    queryParams.append('cond[HOUSE_MANAGE_NO::EQ]', houseManageNo);
+    const response = await fetch(`${baseUrl}?serviceKey=${apiKey}&${queryParams.toString()}`, {
+      signal: AbortSignal.timeout(5000),
+      next: { revalidate: 86400 },
+    });
+    if (!response.ok) return undefined;
+    const json = await response.json();
+    const item: Record<string, string> | undefined = json?.data?.[0];
+    return item?.HSSPLY_ADRES?.trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 // 주택형별 공급 API에서 특별공급 유형별 세대수 합산 (실패 시 null → 화면에서 숨김)
 async function fetchSpecialSupplyCounts(apiKey: string, houseManageNo: string): Promise<SpecialSupplyCounts | null> {
   const controller = new AbortController();
