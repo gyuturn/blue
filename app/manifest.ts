@@ -2,6 +2,7 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    id: '/',
     name: '청약 매칭 가이드',
     short_name: '청약 가이드',
     description: '복잡한 청약 가점을 자동으로 계산하고, 내 상황에 맞는 청약 공고를 추천해 드립니다.',
@@ -53,22 +54,6 @@ export default function manifest(): MetadataRoute.Manifest {
         description: '최신 청약 공고를 확인합니다',
         url: '/announcements',
         icons: [{ src: '/icons/icon-96x96.png', sizes: '96x96' }],
-      },
-    ],
-    screenshots: [
-      {
-        src: '/screenshots/screenshot-home.png',
-        sizes: '390x844',
-        type: 'image/png',
-        form_factor: 'narrow',
-        label: '홈 화면',
-      },
-      {
-        src: '/screenshots/screenshot-calculator.png',
-        sizes: '390x844',
-        type: 'image/png',
-        form_factor: 'narrow',
-        label: '가점 계산기',
       },
     ],
   };
