@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "./globals.css";
 import Header from "@/components/layout/Header";
+import ServiceWorkerRegister from "@/components/layout/ServiceWorkerRegister";
 import { deviceScoreRedirectScript } from "@/lib/home";
 import { LAST_SCORE_KEY } from "@/lib/scoreStorage";
 
@@ -50,6 +51,7 @@ export default function RootLayout({
       <body
         className="font-sans antialiased"
       >
+        <ServiceWorkerRegister />
         <Header />
         {children}
       </body>
