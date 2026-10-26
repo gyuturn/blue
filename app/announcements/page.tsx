@@ -783,7 +783,9 @@ function useMarketPrices(houseManageNo: string, pblancNo: string, enabled: boole
 
 function MarketPriceRow({ loading, estimate, price }: { loading: boolean; estimate: MarketEstimate | null | undefined; price?: string }) {
   if (loading) return <div className="mt-2 h-8 rounded-lg bg-gray-100 animate-pulse" />;
-  if (estimate === undefined) return null;
+  if (estimate === undefined) {
+    return <p className="mt-2 text-xs text-gray-400">이 단지는 주변 시세를 찾지 못했어요</p>;
+  }
   if (estimate === null) {
     return <p className="mt-2 text-xs text-gray-400">주변에 비교할 거래가 부족해요</p>;
   }

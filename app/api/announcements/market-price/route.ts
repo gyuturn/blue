@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { fetchAnnouncementAddress } from '@/lib/announcements';
 import { fetchApplyhomeDetail } from '@/lib/applyhomeDetail';
 import { geocodeAddress, getKakaoRestKey, getLegalDong } from '@/lib/geocode';
 import { estimateMarketPrice, parseUnitArea, type MarketEstimate } from '@/lib/marketPrice';
@@ -23,20 +24,24 @@ export async function GET(request: Request) {
   const rtmsKey = getRtmsKey();
   const restKey = getKakaoRestKey();
   if (!rtmsKey || !restKey) {
-    return NextResponse.json({ enabled: false, data: {} }, { headers: { 'Cache-Control': SHORT_CACHE } });
+    console.warn('[market-price] 실거래가 또는 카카오 REST 키 없음');
+    return NextResponse.json({ enabled: false, reason: 'no-key', data: {} }, { headers: { 'Cache-Control': SHORT_CACHE } });
   }
 
   try {
     const detail = await fetchApplyhomeDetail(houseManageNo, pblancNo);
     const areas = [...new Set(detail.units.map((u) => parseUnitArea(u.type)).filter((a): a is number => a !== null))]
       .slice(0, MAX_AREAS);
-    const address = detail.location?.trim();
+    // 공공분양 등은 청약홈 상세에 공급위치가 없을 수 있어 공고 API 주소로 보완
+    const address = detail.location?.trim() || (await fetchAnnouncementAddress(houseManageNo));
     const sido = address?.split(/\s+/)[0];
     const coords = address && areas.length > 0 ? await geocodeAddress(address, restKey, sido) : null;
     const legalDong = coords ? await getLegalDong(coords, restKey) : null;
     if (!legalDong) {
+      const reason = areas.length === 0 ? 'no-units' : !address ? 'no-address' : !coords ? 'geocode-failed' : 'no-legal-dong';
+      console.warn(`[market-price] ${houseManageNo} ${reason} (${address ?? '주소 없음'})`);
       // 일시 장애일 수 있어 짧게만 캐시
-      return NextResponse.json({ enabled: true, data: {} }, { headers: { 'Cache-Control': SHORT_CACHE } });
+      return NextResponse.json({ enabled: true, reason, data: {} }, { headers: { 'Cache-Control': SHORT_CACHE } });
     }
 
     const now = new Date();
@@ -52,6 +57,8 @@ export async function GET(request: Request) {
     );
   } catch (error) {
     console.error('[market-price] error:', error);
-    return NextResponse.json({ error: 'market price unavailable' }, { status: 502 });
+    // 원인 파악용 (메시지에는 상태 코드·API 오류 코드만 담기고 키는 담기지 않는다)
+    const reason = error instanceof Error ? error.message.slice(0, 120) : 'unknown';
+    return NextResponse.json({ error: 'market price unavailable', reason }, { status: 502 });
   }
 }
