@@ -35,7 +35,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ enabled: false, reason }, { headers: { 'Cache-Control': SHORT_CACHE } });
   }
 
-  const complexes = history.status === 'fulfilled' ? history.value : [];
+  const complexes = history.status === 'fulfilled' ? history.value.complexes : [];
+  // 일부라도 실패했다면 표본이 줄어든 통계라 짧게만 캐시
+  const complete = own.status === 'fulfilled' && history.status === 'fulfilled' && history.value.failed === 0;
   return NextResponse.json(
     {
       enabled: true,
@@ -45,6 +47,6 @@ export async function GET(request: Request) {
       own: own.status === 'fulfilled' ? own.value : [],
       stats: buildBucketStats(complexes),
     },
-    { headers: { 'Cache-Control': own.status === 'fulfilled' && history.status === 'fulfilled' ? OK_CACHE : SHORT_CACHE } },
+    { headers: { 'Cache-Control': complete ? OK_CACHE : SHORT_CACHE } },
   );
 }

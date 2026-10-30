@@ -204,8 +204,10 @@ export function getChanceSuggestions(
   if (specials.length > 0 && weak.length > 0) {
     suggestions.push(`${specials.join('·')} 특별공급 자격이 있어요 — 가점과 별개로 뽑으니 함께 노려보세요`);
   }
-  if (known.length > 0 && weak.length === 0) {
-    suggestions.push('최근 당첨선 기준으로 충분히 경쟁력이 있어요 — 일정에 맞춰 1순위로 신청하세요');
+  if (known.length > 0 && known.every((j) => j.chance.level === 'high')) {
+    suggestions.push('최근 당첨선 기준으로 경쟁력이 있는 편이에요 — 일정에 맞춰 1순위로 신청하세요');
+  } else if (known.length > 0 && weak.length === 0) {
+    suggestions.push('당첨선 근처라 단지마다 결과가 갈렸어요 — 인기 주택형보다 경쟁률이 낮은 주택형을 함께 살펴보세요');
   }
   return suggestions;
 }

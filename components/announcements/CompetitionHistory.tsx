@@ -26,11 +26,13 @@ type HistoryState = { status: 'loading' } | { status: 'off' } | { status: 'ready
 
 const MAX_SCORE = 84;
 
+// 목업·임시 id(mock-001, api-0)는 청약홈 결과가 없으므로 조회하지 않는다
 function useCompetitionHistory(houseManageNo: string, region: string): HistoryState {
-  const key = `${houseManageNo}|${region}`;
+  const key = /^\d+$/.test(houseManageNo) ? `${houseManageNo}|${region}` : '';
   const [result, setResult] = useState<{ key: string; state: HistoryState } | null>(null);
 
   useEffect(() => {
+    if (!key) return;
     let cancelled = false;
     const params = new URLSearchParams({ houseManageNo, region });
     fetch(`/api/announcements/competition?${params.toString()}`)
@@ -46,6 +48,7 @@ function useCompetitionHistory(houseManageNo: string, region: string): HistorySt
     };
   }, [key, houseManageNo, region]);
 
+  if (!key) return { status: 'off' };
   return result?.key === key ? result.state : { status: 'loading' };
 }
 
@@ -60,10 +63,9 @@ export function CompetitionHistory({
   announcement: Announcement;
   scoreData: StoredScoreData | null;
 }) {
-  const validId = /^\d+$/.test(announcement.id);
   const state = useCompetitionHistory(announcement.id, announcement.region);
 
-  if (!validId || state.status === 'off') return null;
+  if (state.status === 'off') return null;
   if (state.status === 'loading') {
     return (
       <div className="space-y-2 mb-4">
@@ -89,7 +91,7 @@ export function CompetitionHistory({
         과거 당첨선으로 본 내 가능성{' '}
         <Tooltip
           term="최저 당첨가점"
-          definition="가점제로 당첨된 사람 중 가장 낮은 점수예요. 내 가점이 이 점수 이상이면 그 단지에서 당첨권이었다는 뜻이에요. 경쟁률은 1순위 해당지역 신청자 수 ÷ 공급 세대수예요."
+          definition="가점제로 당첨된 사람 중 가장 낮은 점수예요. 내 가점이 이 점수 이상이면 그 주택형에서 당첨권이었다는 뜻이에요. 면적대별 통계는 단지마다 당첨선이 가장 낮았던 주택형 기준이에요. 경쟁률은 1순위 해당지역 신청자 수 ÷ 공급 세대수예요."
         >
           <span className="text-blue-400 font-normal">ⓘ</span>
         </Tooltip>
@@ -202,7 +204,7 @@ function BucketRow({ stats, myScore }: { stats: BucketStats; myScore?: number })
       </div>
       {chance && myScore !== undefined && (
         <p className="text-[11px] text-gray-500 mt-1">
-          {chance.total}개 단지 중 {chance.passCount}곳은 내 가점({myScore}점)이 당첨선 이상이었어요
+          {chance.total}개 단지 중 {chance.passCount}곳은 내 가점({myScore}점)으로 당첨권인 주택형이 있었어요
         </p>
       )}
     </div>

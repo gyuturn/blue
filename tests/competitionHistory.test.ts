@@ -77,5 +77,17 @@ test('불리한 면적대가 있으면 부족한 점수·추첨제·특공을 �
   assert.equal(suggestions[0], '60㎡ 이하 주택형이 내 가점으로 상대적으로 유리했어요');
   assert.ok(suggestions.some((s) => s.includes('약 15점 부족')));
   assert.ok(suggestions.some((s) => s.startsWith('신혼부부 특별공급')));
-  assert.deepEqual(getChanceSuggestions(80, stats), ['최근 당첨선 기준으로 충분히 경쟁력이 있어요 — 일정에 맞춰 1순위로 신청하세요']);
+  assert.deepEqual(getChanceSuggestions(80, stats), ['최근 당첨선 기준으로 경쟁력이 있는 편이에요 — 일정에 맞춰 1순위로 신청하세요']);
+  // 모두 '도전해볼 만함'이면 확신하는 문구를 쓰지 않는다
+  assert.ok(!getChanceSuggestions(65, stats).some((s) => s.includes('경쟁력이 있는 편')));
+});
+
+test('빈 데이터·경계값·면적 없는 주택형을 안전하게 처리한다', () => {
+  assert.deepEqual(buildBucketStats([]), []);
+  assert.deepEqual(buildBucketStats([[unit(84, null)]]), []);
+  const noArea = { ...unit(84, 50), area: null };
+  assert.deepEqual(buildBucketStats([[noArea]]), []);
+  const edges = buildBucketStats([[unit(60, 30), unit(85, 40), unit(85.01, 50)]]);
+  assert.deepEqual(edges.map((s) => [s.bucket, s.lowestMin]), [['small', 30], ['mid', 40], ['large', 50]]);
+  assert.deepEqual(getChanceSuggestions(50, []), []);
 });

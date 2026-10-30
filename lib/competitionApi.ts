@@ -6,7 +6,7 @@ const CMPET_BASE = 'https://api.odcloud.kr/api/ApplyhomeInfoCmpetRtSvc/v1';
 const DETAIL_URL = 'https://api.odcloud.kr/api/ApplyhomeInfoDetailSvc/v1/getAPTLttotPblancDetail';
 const MAX_COMPLEXES = 15;
 // 당첨자 발표·결과 공개까지 시간이 걸려 최근 공고는 제외
-const RESULT_DELAY_DAYS = 20;
+const RESULT_DELAY_DAYS = 35;
 // 마감된 공고 결과는 바뀌지 않으므로 길게 캐시
 const RESULT_REVALIDATE = 86400;
 
@@ -43,7 +43,7 @@ async function fetchPastAnnouncements(apiKey: string, region: string, now: Date)
   const to = new Date(now.getTime() - RESULT_DELAY_DAYS * 86400000);
 
   const build = (withDate: boolean) => {
-    const params = new URLSearchParams({ page: '1', perPage: '200', returnType: 'JSON' });
+    const params = new URLSearchParams({ page: '1', perPage: '500', returnType: 'JSON' });
     params.append('cond[SUBSCRPT_AREA_CODE_NM::EQ]', region);
     if (withDate) {
       params.append('cond[RCRIT_PBLANC_DE::GTE]', ymd(from));
@@ -67,13 +67,13 @@ async function fetchPastAnnouncements(apiKey: string, region: string, now: Date)
     .sort((a, b) => b.date.localeCompare(a.date));
 }
 
-// 지역 최근 민영 단지들의 결과. 개별 단지 조회 실패는 건너뛴다.
+// 지역 최근 민영 단지들의 결과. 개별 단지 조회 실패는 건너뛰고 실패 수를 함께 돌려준다.
 export async function fetchRegionHistory(
   apiKey: string,
   region: string,
   now: Date,
   excludeId?: string,
-): Promise<UnitResult[][]> {
+): Promise<{ complexes: UnitResult[][]; failed: number }> {
   const past = (await fetchPastAnnouncements(apiKey, region, now))
     .filter((a) => a.id !== excludeId)
     .slice(0, MAX_COMPLEXES);
@@ -83,5 +83,5 @@ export async function fetchRegionHistory(
   if (past.length > 0 && settled.every((s) => s.status === 'rejected')) {
     throw (settled[0] as PromiseRejectedResult).reason;
   }
-  return complexes;
+  return { complexes, failed: settled.filter((s) => s.status === 'rejected').length };
 }
