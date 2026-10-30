@@ -6,6 +6,7 @@ import Disclaimer from '@/components/Disclaimer';
 import type { Announcement, StoredScoreData } from '@/types';
 import { getDday, getDdayBadgeStyle } from '@/lib/announcements';
 import { CompetitionSummary, SpecialSupplyChips } from '@/components/announcements/CompetitionInsight';
+import { CompetitionHistory } from '@/components/announcements/CompetitionHistory';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { readLocalStorage } from '@/hooks/useLocalStorage';
 import { LAST_SCORE_KEY, parseSavedScore, toStoredScoreData } from '@/lib/scoreStorage';
@@ -162,6 +163,8 @@ export default function AnnouncementDetailPage({ params }: { params: Promise<{ i
             )}
           </div>
         )}
+
+        <CompetitionHistory announcement={announcement} scoreData={scoreData} />
 
         {/* CTA 버튼 */}
         <div className="space-y-3 mb-6">
