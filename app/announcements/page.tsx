@@ -21,6 +21,7 @@ import { hasDeviceScore } from '@/lib/home';
 import { INITIAL_REGION, LEGACY_REGION_KEY, REGION_OPTIONS, getRegionQuery } from '@/lib/regions';
 import { LAST_SCORE_KEY, isEligibilityInput, parseSavedScore, toStoredScoreData } from '@/lib/scoreStorage';
 import { parseUnitArea, type MarketEstimate } from '@/lib/marketPrice';
+import { CompetitionHistory } from '@/components/announcements/CompetitionHistory';
 
 const AnnouncementMap = dynamic(() => import('@/components/announcements/AnnouncementMap'), { ssr: false });
 const MAP_ENABLED = !!KAKAO_JS_KEY;
@@ -653,6 +654,8 @@ function AnnouncementDetail({ announcement, scoreData }: { announcement: Announc
         )}
         <SpecialSupplyChips announcement={announcement} scoreData={scoreData} />
       </div>
+
+      <CompetitionHistory announcement={announcement} scoreData={scoreData} />
 
       {/* 청약홈 상세 데이터 */}
       {detailLoading ? (
