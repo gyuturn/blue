@@ -5,16 +5,18 @@ on:
 jobs:
   diag:
     runs-on: ubuntu-latest
+    environment: prd
     steps:
       - name: Call odcloud directly with production key
         env:
           KEY: ${{ secrets.PUBLIC_DATA_API_KEY }}
         run: |
           echo "key length: ${#KEY}"
+          [ -n "$KEY" ] || exit 1
           call() {
             echo "=== $1 ==="
             curl -sS "https://api.odcloud.kr/api/$1?serviceKey=${KEY}&page=1&perPage=2&returnType=JSON&$2" -o out.json -w "HTTP %{http_code}\n"
-            head -c 1200 out.json | sed "s/${KEY}/***/g"; echo
+            B=$(head -c 1200 out.json); echo "${B//$KEY/***}"
           }
           call ApplyhomeInfoDetailSvc/v1/getAPTLttotPblancDetail ""
           call ApplyhomeInfoCmpetRtSvc/v1/getAPTLttotPblancCmpet ""
