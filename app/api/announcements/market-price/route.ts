@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { fetchAnnouncementAddress } from '@/lib/announcements';
 import { fetchApplyhomeDetail } from '@/lib/applyhomeDetail';
-import { geocodeAddress, getKakaoRestKey, getLegalDong } from '@/lib/geocode';
-import { estimateMarketPrice, parseUnitArea, type MarketEstimate } from '@/lib/marketPrice';
+import { resolveLawd } from '@/lib/lawdCode';
+import { estimateMarketPrice, parseUnitArea, type AptTrade, type MarketEstimate } from '@/lib/marketPrice';
 import { fetchRecentTrades, getRtmsKey } from '@/lib/rtms';
 
 export const maxDuration = 30;
@@ -22,9 +22,8 @@ export async function GET(request: Request) {
   }
 
   const rtmsKey = getRtmsKey();
-  const restKey = getKakaoRestKey();
-  if (!rtmsKey || !restKey) {
-    console.warn('[market-price] 실거래가 또는 카카오 REST 키 없음');
+  if (!rtmsKey) {
+    console.warn('[market-price] 실거래가 API 키 없음');
     return NextResponse.json({ enabled: false, reason: 'no-key', data: {} }, { headers: { 'Cache-Control': SHORT_CACHE } });
   }
 
@@ -34,21 +33,33 @@ export async function GET(request: Request) {
       .slice(0, MAX_AREAS);
     // 공공분양 등은 청약홈 상세에 공급위치가 없을 수 있어 공고 API 주소로 보완
     const address = detail.location?.trim() || (await fetchAnnouncementAddress(houseManageNo));
-    const sido = address?.split(/\s+/)[0];
-    const coords = address && areas.length > 0 ? await geocodeAddress(address, restKey, sido) : null;
-    const legalDong = coords ? await getLegalDong(coords, restKey) : null;
-    if (!legalDong) {
-      const reason = areas.length === 0 ? 'no-units' : !address ? 'no-address' : !coords ? 'geocode-failed' : 'no-legal-dong';
+    const target = address && areas.length > 0 ? resolveLawd(address) : null;
+    if (!target) {
+      const reason = areas.length === 0 ? 'no-units' : !address ? 'no-address' : 'unknown-sigungu';
       console.warn(`[market-price] ${houseManageNo} ${reason} (${address ?? '주소 없음'})`);
-      // 일시 장애일 수 있어 짧게만 캐시
       return NextResponse.json({ enabled: true, reason, data: {} }, { headers: { 'Cache-Control': SHORT_CACHE } });
     }
 
     const now = new Date();
-    const { trades, complete } = await fetchRecentTrades(legalDong.lawdCd, rtmsKey, now);
+    // 구가 생략된 시는 하위 구 전체를 합친다. 코드별로 차례로 불러 동시 호출 수를 6(개월) 이내로 유지하고,
+    // 일부 코드 실패는 건너뛴다(전부 실패하면 예외).
+    const trades: AptTrade[] = [];
+    let complete = true;
+    let lastError: unknown;
+    for (const code of target.lawdCds) {
+      try {
+        const r = await fetchRecentTrades(code, rtmsKey, now);
+        trades.push(...r.trades);
+        complete &&= r.complete;
+      } catch (error) {
+        complete = false;
+        lastError = error;
+      }
+    }
+    if (trades.length === 0 && lastError) throw lastError;
     const data: Record<string, MarketEstimate | null> = {};
     for (const area of areas) {
-      data[String(area)] = estimateMarketPrice(trades, area, legalDong.dong, now.getFullYear());
+      data[String(area)] = estimateMarketPrice(trades, area, target.dong, now.getFullYear());
     }
 
     return NextResponse.json(
