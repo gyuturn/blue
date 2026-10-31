@@ -11,18 +11,25 @@ jobs:
       PUBLIC_DATA_API_KEY: ${{ secrets.PUBLIC_DATA_API_KEY }}
     steps:
       - uses: actions/checkout@v4
-      - name: RTMS 시군구 코드 검증 (202609 거래 건수 + 동 이름 샘플)
+      - name: 신규 시도 코드 탐색 (광주·전남 등)
         run: |
           check() {
-            x=$(curl -sS -m 20 "https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev?serviceKey=$PUBLIC_DATA_API_KEY&LAWD_CD=$1&DEAL_YMD=202609&numOfRows=1000&pageNo=1")
+            x=$(curl -sS -m 20 --retry 2 "https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev?serviceKey=$PUBLIC_DATA_API_KEY&LAWD_CD=$1&DEAL_YMD=202609&numOfRows=1000&pageNo=1")
             rc=$(echo "$x" | grep -o '<resultCode>[^<]*' | head -1 | cut -d'>' -f2)
             tc=$(echo "$x" | grep -o '<totalCount>[^<]*' | cut -d'>' -f2)
             dongs=$(echo "$x" | grep -o '<umdNm>[^<]*' | cut -d'>' -f2 | sort -u | head -6 | tr '\n' ',')
             echo "CODE $1 rc=$rc total=$tc dongs=$dongs"
           }
           export -f check
-          xargs -P 6 -I{} bash -c 'check {}' < .github/diag-codes.txt | sort > result.txt
-          echo "== 거래 있는 코드: $(grep -vc 'total=0\|total=$' result.txt)"
-          grep -v 'rc=000' result.txt | head -5
-          grep -E 'CODE (4119|4159|281|282|27720|51|52)' result.txt | grep -v 'total=0 ' 
-          echo "== 거래 0건 (테이블 기준)"; grep 'total=0 ' result.txt | grep -vE 'CODE (281|282)' 
+          known=" 11 26 27 28 29 30 31 36 41 43 44 46 47 48 50 51 52 "
+          for p in $(seq 10 99); do [[ $known == *" $p "* ]] && continue; for s in 110 130 140 150 155 170 200 710 720 730 810 910; do echo "$p$s"; done; done > stage1.txt
+          printf '%s\n' 28110 28140 28260 28720 48170 52730 29110 46110 >> stage1.txt
+          xargs -P 8 -I{} bash -c 'check {}' < stage1.txt | sort > r1.txt
+          echo "== stage1 non-000:"; grep -v 'rc=000' r1.txt | head
+          echo "== stage1 hits:"; grep -v 'total=0 \|total= ' r1.txt
+          prefixes=$(grep -v 'total=0 \|total= ' r1.txt | awk '{print substr($2,1,2)}' | sort -u | grep -vE '^(28|29|46|48|52)$')
+          echo "prefixes: $prefixes"
+          for p in $prefixes; do seq -f "$p%03g" 100 999; done > stage2.txt
+          xargs -P 8 -I{} bash -c 'check {}' < stage2.txt | sort > r2.txt
+          echo "== stage2 hits:"; grep -v 'total=0 \|total= ' r2.txt
+          echo "== stage2 errors:"; grep -v 'rc=000' r2.txt | head
