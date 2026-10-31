@@ -1,0 +1,22 @@
+name: Diag competition API
+on:
+  pull_request:
+    branches: ["main"]
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call production endpoints
+        run: |
+          BASE=https://blue-snowy.vercel.app
+          for R in 서울 경기; do
+            echo "=== announcements $R ==="
+            curl -sS -G "$BASE/api/announcements" --data-urlencode "region=$R" -o ann.json -w "HTTP %{http_code}\n"
+            IDS=$(jq -r '[.. | objects | select(has("houseManageNo") or has("complexName")) | .id] | map(select(test("^[0-9]+$"))) | .[:2] | .[]' ann.json)
+            echo "ids: $IDS"
+            for ID in $IDS; do
+              echo "=== competition $R $ID ==="
+              curl -sS -G "$BASE/api/announcements/competition" --data-urlencode "houseManageNo=$ID" --data-urlencode "region=$R" -w "\nHTTP %{http_code}\n" | head -c 3000
+              echo
+            done
+          done
