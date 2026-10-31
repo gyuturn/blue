@@ -31,3 +31,17 @@ test('모르는 주소는 null', () => {
   assert.equal(resolveLawd('일원 B-1블록'), null);
   assert.equal(resolveLawd(''), null);
 });
+
+test('2026 개편: 화성 일반구, 인천 옛 구 이름, 광주·전남 통합 코드', () => {
+  assert.deepEqual(resolveLawd('경기도 화성시 동탄구 오산동 1')?.lawdCds, ['41597']);
+  assert.deepEqual(resolveLawd('경기도 화성시 봉담읍 동화리 1')?.lawdCds.sort(), ['41591', '41593', '41595', '41597']);
+  assert.deepEqual(resolveLawd('인천광역시 중구 운서동 1'), { lawdCds: ['28125', '28155'], dong: '운서동' });
+  assert.deepEqual(resolveLawd('인천광역시 검단구 마전동 1')?.lawdCds, ['28290']);
+  assert.deepEqual(resolveLawd('광주광역시 북구 문흥동 1'), { lawdCds: ['12300'], dong: '문흥동' });
+  assert.deepEqual(resolveLawd('전라남도 순천시 해룡면 신대리 1'), { lawdCds: ['12150'], dong: '해룡면' });
+  assert.deepEqual(resolveLawd('전남광주통합특별시 광주 광산구 선암동 1')?.lawdCds, ['12330']);
+});
+
+test('경기도 광주시는 광주·전남과 헷갈리지 않는다', () => {
+  assert.deepEqual(resolveLawd('경기도 광주시 오포읍 1')?.lawdCds, ['41610']);
+});
