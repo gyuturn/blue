@@ -119,37 +119,3 @@ export async function geocodeMany<T extends { id: string; address?: string; regi
   }
   return { data: result, complete: true };
 }
-
-export interface LegalDong {
-  lawdCd: string; // 법정동코드 앞 5자리(시군구) — 실거래가 API LAWD_CD
-  dong?: string;  // 법정동(읍·면·동) 이름
-}
-
-// 좌표 → 법정동 (카카오 coord2regioncode, region_type B). 키 오류·쿼터 초과는 예외.
-export async function getLegalDong({ lat, lng }: LatLng, restKey: string): Promise<LegalDong | null> {
-  const url = `https://dapi.kakao.com/v2/local/geo/coord2regioncode.json?x=${lng}&y=${lat}`;
-  try {
-    const res = await fetch(url, {
-      headers: { Authorization: `KakaoAK ${restKey}` },
-      next: { revalidate: CACHE_SECONDS },
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    });
-    if (res.status === 401 || res.status === 403 || res.status === 429) {
-      throw new KakaoAuthError(`kakao coord2regioncode ${res.status}`);
-    }
-    if (!res.ok) {
-      console.warn(`[geocode] coord2regioncode ${res.status}`);
-      return null;
-    }
-    const json = (await res.json()) as {
-      documents?: { region_type: string; code: string; region_3depth_name?: string }[];
-    };
-    const b = json.documents?.find((d) => d.region_type === 'B');
-    if (!b || !/^\d{10}$/.test(b.code)) return null;
-    return { lawdCd: b.code.slice(0, 5), dong: b.region_3depth_name || undefined };
-  } catch (error) {
-    if (error instanceof KakaoAuthError) throw error;
-    console.warn('[geocode] coord2regioncode failed', error);
-    return null;
-  }
-}
