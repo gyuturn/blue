@@ -6,17 +6,18 @@ jobs:
   diag:
     runs-on: ubuntu-latest
     steps:
-      - name: Call production endpoints
+      - name: Call odcloud directly with production key
+        env:
+          KEY: ${{ secrets.PUBLIC_DATA_API_KEY }}
         run: |
-          BASE=https://blue-snowy.vercel.app
-          for R in 서울 경기; do
-            echo "=== announcements $R ==="
-            curl -sS -G "$BASE/api/announcements" --data-urlencode "region=$R" -o ann.json -w "HTTP %{http_code}\n"
-            IDS=$(jq -r '[.. | objects | select(has("houseManageNo") or has("complexName")) | .id] | map(select(test("^[0-9]+$"))) | .[:2] | .[]' ann.json)
-            echo "ids: $IDS"
-            for ID in $IDS; do
-              echo "=== competition $R $ID ==="
-              curl -sS -G "$BASE/api/announcements/competition" --data-urlencode "houseManageNo=$ID" --data-urlencode "region=$R" -w "\nHTTP %{http_code}\n" | head -c 3000
-              echo
-            done
-          done
+          echo "key length: ${#KEY}"
+          call() {
+            echo "=== $1 ==="
+            curl -sS "https://api.odcloud.kr/api/$1?serviceKey=${KEY}&page=1&perPage=2&returnType=JSON&$2" -o out.json -w "HTTP %{http_code}\n"
+            head -c 1200 out.json | sed "s/${KEY}/***/g"; echo
+          }
+          call ApplyhomeInfoDetailSvc/v1/getAPTLttotPblancDetail ""
+          call ApplyhomeInfoCmpetRtSvc/v1/getAPTLttotPblancCmpet ""
+          call ApplyhomeInfoCmpetRtSvc/v1/getAptLttotPblancScore ""
+          call ApplyhomeInfoCmpetRtSvc/v1/getAPTLttotPblancScore ""
+          call ApplyhomeInfoCmpetRtSvc/v1/getAPTLttotPblancCmpet "cond%5BHOUSE_MANAGE_NO%3A%3AEQ%5D=2026000201"
