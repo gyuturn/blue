@@ -3,6 +3,8 @@ name: CD
 on:
   push:
     branches: ["main"]
+  # 환경변수만 바꿨을 때 Actions → CD → Run workflow로 재배포
+  workflow_dispatch:
 
 jobs:
   deploy:
