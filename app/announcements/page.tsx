@@ -797,26 +797,50 @@ function MarketPriceRow({ loading, estimate, price }: { loading: boolean; estima
   const diff = supply > 0 ? estimate.estimate - supply : null;
   const similar = diff !== null && Math.abs(diff) <= estimate.estimate * 0.03;
   const basis = `${estimate.dong ?? '같은 시군구'} ${estimate.newOnly ? '10년 이내 ' : ''}아파트 · 최근 ${estimate.months}개월 ${estimate.count}건`;
+  const buildAge = new Date().getFullYear() - estimate.medianBuildYear;
+  // 구축과 비교한 차이는 좋다/나쁘다로 읽히지 않도록 색을 빼고 이유를 함께 보여준다
+  const diffColor = similar || !estimate.newOnly ? 'text-gray-600' : diff! > 0 ? 'text-green-600' : 'text-red-600';
 
   return (
     <div className="mt-2 rounded-lg bg-gray-50 px-2.5 py-2 text-xs">
       <p className="text-gray-600">
         <Tooltip
           term="주변 시세"
-          definition="국토교통부 실거래가 기준, 비슷한 면적(±5㎡) 거래의 ㎡당 가격 중위값으로 환산한 참고용 시세예요. 실제 시세·향후 가격과 다를 수 있어요."
+          definition="국토교통부 실거래가 기준, 비슷한 면적(±5㎡) 거래의 ㎡당 가격 중위값을 이 주택형 면적으로 환산한 참고용 시세예요. 실제 시세·향후 가격과 다를 수 있어요."
         >
           주변 시세
         </Tooltip>{' '}
         <span className="font-semibold text-gray-900">약 {formatPriceKorean(String(estimate.estimate))}</span>
       </p>
       {diff !== null && (
-        <p className={`font-medium mt-0.5 ${similar ? 'text-gray-600' : diff > 0 ? 'text-green-600' : 'text-red-600'}`}>
+        <p className={`font-medium mt-0.5 ${diffColor}`}>
           {similar
             ? '분양가가 주변 시세와 비슷해요'
             : `분양가가 약 ${formatPriceKorean(String(Math.abs(diff)))} ${diff > 0 ? '낮아요 ↓' : '높아요 ↑'}`}
         </p>
       )}
+      {!estimate.newOnly && (
+        <p className="mt-1 text-amber-700 break-keep">
+          근처에 새 아파트 거래가 없어 평균 {buildAge}년 된 아파트와 비교했어요. 새 아파트는 보통 이보다 비싸게 거래돼요.
+        </p>
+      )}
       <p className="text-gray-400 mt-0.5">{basis}</p>
+      {estimate.complexes.length > 0 && (
+        <ul className="mt-1.5 space-y-1 border-t border-gray-200 pt-1.5">
+          {estimate.complexes.map((c) => (
+            <li key={`${c.dong}-${c.name}`} className="flex items-baseline justify-between gap-2">
+              <span className="text-gray-700 min-w-0 truncate">
+                {c.name}
+                <span className="text-gray-400"> · {c.buildYear}년 · {Math.round(c.area)}㎡</span>
+              </span>
+              <span className="flex-shrink-0 text-gray-800 font-medium">
+                {formatPriceKorean(String(c.price))}
+                <span className="text-gray-400 font-normal"> ({c.dealDate.slice(2, 7).replace('-', '.')})</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

@@ -29,8 +29,8 @@ test('최근 6개월을 한국 시간 기준으로 만든다 (연도 경계 포�
   assert.deepEqual(recentMonths(new Date('2026-03-15T00:00:00Z')).length, 6);
 });
 
-const t = (umdNm: string, area: number, price: number, buildYear: number): AptTrade =>
-  ({ aptNm: 'x', umdNm, area, price, buildYear, dealDate: '2026-09-01' });
+const t = (umdNm: string, area: number, price: number, buildYear: number, aptNm = 'x', dealDate = '2026-09-01'): AptTrade =>
+  ({ aptNm, umdNm, area, price, buildYear, dealDate });
 
 test('같은 동·신축 거래가 3건 이상이면 그것만으로 ㎡당 중위값 × 면적', () => {
   const trades = [
@@ -41,15 +41,25 @@ test('같은 동·신축 거래가 3건 이상이면 그것만으로 ㎡당 중�
     t('사직동', 84, 200000, 2022), // 다른 동 — 제외
     t('홍파동', 59, 70000, 2020), // 면적 차이 — 제외
   ];
-  assert.deepEqual(estimateMarketPrice(trades, 84.98, '홍파동', 2026), {
-    estimate: Math.round(1100 * 84.98), count: 3, dong: '홍파동', newOnly: true, months: 6,
-  });
+  const r = estimateMarketPrice(trades, 84.98, '홍파동', 2026);
+  assert.equal(r?.estimate, Math.round(1100 * 84.98));
+  assert.equal(r?.count, 3);
+  assert.equal(r?.dong, '홍파동');
+  assert.equal(r?.newOnly, true);
+  assert.equal(r?.medianBuildYear, 2020);
 });
 
-test('같은 동 신축이 부족하면 같은 동 전체 → 시군구 순으로 넓힌다', () => {
+test('같은 동 신축이 부족하면 시군구 신축 → 같은 동 구축 → 시군구 순으로 넓힌다', () => {
   const sameDong = [t('홍파동', 84, 84000, 2020), t('홍파동', 84, 84000, 1990), t('홍파동', 84, 84000, 1995)];
   assert.equal(estimateMarketPrice(sameDong, 84, '홍파동', 2026)?.newOnly, false);
   assert.equal(estimateMarketPrice(sameDong, 84, '홍파동', 2026)?.dong, '홍파동');
+  assert.equal(estimateMarketPrice(sameDong, 84, '홍파동', 2026)?.medianBuildYear, 1995);
+
+  // 같은 동에 구축만 있고 시군구에 신축이 있으면 신축을 먼저 쓴다
+  const mixed = [...sameDong, t('사직동', 84, 120000, 2021), t('평동', 84, 120000, 2022)];
+  const m = estimateMarketPrice(mixed, 84, '홍파동', 2026);
+  assert.equal(m?.newOnly, true);
+  assert.equal(m?.dong, undefined);
 
   const sgg = [t('사직동', 84, 84000, 2020), t('평동', 84, 84000, 2021), t('홍파동', 84, 84000, 2022)];
   const r = estimateMarketPrice(sgg, 84, '홍파동', 2026);
@@ -65,4 +75,16 @@ test('읍·면 지역은 "봉담읍 동화리"처럼 와도 같은 읍으로 본
 test('비교 거래가 3건 미만이면 null', () => {
   assert.equal(estimateMarketPrice([t('홍파동', 84, 84000, 2020), t('홍파동', 84, 84000, 2020)], 84, '홍파동', 2026), null);
   assert.equal(estimateMarketPrice([], 84, undefined, 2026), null);
+});
+
+test('비교 단지를 거래 많은 순으로 최근 거래와 함께 요약한다', () => {
+  const trades = [
+    t('홍파동', 84, 90000, 2020, 'A단지', '2026-07-01'),
+    t('홍파동', 84, 95000, 2020, 'A단지', '2026-09-10'),
+    t('홍파동', 83, 88000, 2021, 'B단지', '2026-08-01'),
+  ];
+  assert.deepEqual(estimateMarketPrice(trades, 84, '홍파동', 2026)?.complexes, [
+    { name: 'A단지', dong: '홍파동', buildYear: 2020, area: 84, price: 95000, dealDate: '2026-09-10', count: 2 },
+    { name: 'B단지', dong: '홍파동', buildYear: 2021, area: 83, price: 88000, dealDate: '2026-08-01', count: 1 },
+  ]);
 });

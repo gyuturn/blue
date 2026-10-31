@@ -9,12 +9,25 @@ export interface AptTrade {
   dealDate: string;  // YYYY-MM-DD
 }
 
+// 비교에 쓴 단지 (최근 거래 1건 기준)
+export interface ComparableComplex {
+  name: string;
+  dong: string;
+  buildYear: number;
+  area: number;      // 최근 거래 전용면적(㎡)
+  price: number;     // 최근 거래가(만원)
+  dealDate: string;  // YYYY-MM-DD
+  count: number;     // 이 단지 비교 거래 건수
+}
+
 export interface MarketEstimate {
   estimate: number;  // 추정 시세(만원)
   count: number;     // 비교 거래 건수
   dong?: string;     // 같은 법정동 기준이면 동 이름, 없으면 시군구 전체
   newOnly: boolean;  // 10년 이내 준공 아파트만 비교했는지
   months: number;    // 조회 기간(개월)
+  medianBuildYear: number;         // 비교 단지 준공연도 중위값
+  complexes: ComparableComplex[];  // 거래 많은 순 최대 5개
 }
 
 export const MARKET_MONTHS = 6;
@@ -80,8 +93,34 @@ function isSameDong(umdNm: string, dong: string): boolean {
   return umdNm === dong || umdNm.startsWith(`${dong} `);
 }
 
-// 비슷한 면적 거래를 같은 동·신축 → 같은 동 → 시군구·신축 → 시군구 순으로 찾아
+const MAX_COMPLEXES = 5;
+
+function summarizeComplexes(trades: AptTrade[]): ComparableComplex[] {
+  const groups = new Map<string, AptTrade[]>();
+  for (const t of trades) {
+    const key = `${t.umdNm}|${t.aptNm}`;
+    groups.set(key, [...(groups.get(key) ?? []), t]);
+  }
+  return [...groups.values()]
+    .map((list) => {
+      const latest = list.reduce((a, b) => (b.dealDate > a.dealDate ? b : a));
+      return {
+        name: latest.aptNm,
+        dong: latest.umdNm,
+        buildYear: latest.buildYear,
+        area: latest.area,
+        price: latest.price,
+        dealDate: latest.dealDate,
+        count: list.length,
+      };
+    })
+    .sort((a, b) => b.count - a.count || b.dealDate.localeCompare(a.dealDate))
+    .slice(0, MAX_COMPLEXES);
+}
+
+// 비슷한 면적 거래를 같은 동·신축 → 시군구·신축 → 같은 동 → 시군구 순으로 찾아
 // ㎡당 가격 중위값 × 주택형 면적으로 시세를 추정한다.
+// 새 아파트 분양가는 구축과 비교하면 왜곡되므로 "가까움"보다 "신축"을 먼저 본다.
 export function estimateMarketPrice(
   trades: AptTrade[],
   area: number,
@@ -92,8 +131,9 @@ export function estimateMarketPrice(
   const similar = trades.filter((t) => Math.abs(t.area - area) <= AREA_TOLERANCE);
   const isNew = (t: AptTrade) => t.buildYear >= currentYear - NEW_BUILD_YEARS;
   const stages: { dong?: string; newOnly: boolean }[] = [
-    ...(dong ? [{ dong, newOnly: true }, { dong, newOnly: false }] : []),
+    ...(dong ? [{ dong, newOnly: true }] : []),
     { newOnly: true },
+    ...(dong ? [{ dong, newOnly: false }] : []),
     { newOnly: false },
   ];
   for (const stage of stages) {
@@ -102,7 +142,15 @@ export function estimateMarketPrice(
     );
     if (picked.length < MIN_TRADES) continue;
     const perSqm = median(picked.map((t) => t.price / t.area));
-    return { estimate: Math.round(perSqm * area), count: picked.length, dong: stage.dong, newOnly: stage.newOnly, months };
+    return {
+      estimate: Math.round(perSqm * area),
+      count: picked.length,
+      dong: stage.dong,
+      newOnly: stage.newOnly,
+      months,
+      medianBuildYear: Math.round(median(picked.map((t) => t.buildYear))),
+      complexes: summarizeComplexes(picked),
+    };
   }
   return null;
 }
