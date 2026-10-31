@@ -9,24 +9,21 @@ jobs:
     environment: prd
     env:
       PUBLIC_DATA_API_KEY: ${{ secrets.PUBLIC_DATA_API_KEY }}
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: "20" }
-      - name: End-to-end (최근 공고 + 한화포레나 지제역)
+      - name: 평택(41220) 106~122㎡ 신축 거래 원본
         run: |
-          npm ci --silent
-          npm run build > /dev/null
-          npx next start -p 3000 > server.log 2>&1 &
-          sleep 8
-          curl -sS -m 30 "http://localhost:3000/api/announcements" | python3 -c "
-          import sys,json; d=json.load(sys.stdin); items=d.get('data',d if isinstance(d,list) else [])
-          ids=[(a['id'],a.get('pblancNo',a['id']),a['complexName'],a.get('address','')) for a in items][:10]
-          ids.insert(0,('2026000499','2026000499','한화포레나 지제역','경기도 평택시 세교동 725번지 일원'))
-          open('ids.txt','w').write('\n'.join('\t'.join(x) for x in ids))"
-          while IFS=$'\t' read -r hm pb name addr; do
-            echo "== $name | $addr"
-            curl -sS -m 60 "http://localhost:3000/api/announcements/market-price?houseManageNo=$hm&pblancNo=$pb" | head -c 900; echo
-          done < ids.txt
-          echo "== server log"; grep -E "market-price|rtms" server.log | tail -20
+          for ym in 202605 202606 202607 202608 202609 202610; do
+            curl -sS -m 30 "https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev?serviceKey=$PUBLIC_DATA_API_KEY&LAWD_CD=41220&DEAL_YMD=$ym&numOfRows=1000&pageNo=1" > $ym.xml
+          done
+          python3 - <<'PY'
+          import re,glob
+          rows=[]
+          for f in sorted(glob.glob('*.xml')):
+              for it in re.findall(r'<item>(.*?)</item>', open(f).read(), re.S):
+                  g=lambda t:(re.search(f'<{t}>(.*?)</{t}>',it,re.S) or [None,''])[1].strip()
+                  a=float(g('excluUseAr') or 0); p=int(g('dealAmount').replace(',','') or 0); y=int(g('buildYear') or 0)
+                  if 106<=a<=122 and y>=2016: rows.append((round(p/a),p,a,y,g('aptNm'),g('umdNm'),g('dealYear')+g('dealMonth').zfill(2)+g('dealDay').zfill(2),g('cdealType'),g('dealingGbn'),g('floor')))
+          rows.sort()
+          for r in rows: print(r)
+          print('n=',len(rows))
+          PY
