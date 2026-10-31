@@ -300,6 +300,8 @@ function toSido(token: string): string | undefined {
 const LEGACY: Record<string, Record<string, string[]>> = {
   // 2026 인천 행정체제 개편: 중구 → 제물포구·영종구, 동구 → 제물포구, 서구 → 서구·검단구
   인천광역시: { 중구: ['28125', '28155'], 동구: ['28125'], 서구: ['28275', '28290'] },
+  // 2023 군위군 대구 편입
+  경상북도: { 군위군: ['27720'] },
 };
 
 // 시/도 → (시군구 이름 → 코드). "수원시 장안구"처럼 구가 있는 시는 "시 구" 이름으로 들어 있다.
@@ -324,7 +326,9 @@ function findSigungu(table: Map<string, string>, tokens: string[]): { codes: str
   return null;
 }
 
-const DONG_RE = /^[가-힣0-9]+(동|읍|면|가)$/;
+// "101동"(건물 동)·"근린상가"는 법정동이 아니다
+const DONG_RE = /^[가-힣][가-힣0-9]*(동|읍|면|가)$/;
+const isDong = (t: string) => DONG_RE.test(t) && !t.endsWith('상가');
 
 export function resolveLawd(address: string): LawdTarget | null {
   const tokens = address
@@ -343,7 +347,10 @@ export function resolveLawd(address: string): LawdTarget | null {
     // 통합 명칭 뒤에 "광주"가 한 번 더 오는 표기 ("○○특별시 광주 동구")
     if (sido === '광주전남' && /^광주(광역시)?$/.test(tokens[1] ?? '')) start = 2;
     const legacy = LEGACY[sido]?.[tokens[start]];
-    if (legacy) {
+    // 옛 구 이름이 여러 구로 나뉜 경우 동 이름이 있어야 맞는 구를 고를 수 있다
+    // (동이 없으면 현재 이름(예: 서구)으로 찾거나 포기 — 다른 구 시세를 섞지 않기 위해)
+    const legacyOk = legacy && (legacy.length === 1 || tokens.slice(start + 1).some(isDong));
+    if (legacyOk) {
       found = { codes: legacy, used: 1 };
     } else if (table.size === 1) {
       // 세종처럼 시군구가 하나뿐인 시/도
@@ -355,13 +362,14 @@ export function resolveLawd(address: string): LawdTarget | null {
   } else {
     // 시/도 없이 "평택시 세교동"처럼 시작하면 전국에서 유일하게 맞을 때만 사용
     const matches = [...BY_SIDO.values()].map((t) => findSigungu(t, tokens)).filter((m) => m !== null);
-    if (matches.length === 1) {
+    // "광주시 북구"처럼 다른 시/도의 구가 뒤따르면 잘못 짚은 것이므로 포기
+    if (matches.length === 1 && !/구$/.test(tokens[matches[0].used] ?? '')) {
       found = matches[0];
       rest = tokens.slice(found.used);
     }
   }
   if (!found) return null;
 
-  const dong = rest.find((t) => DONG_RE.test(t));
+  const dong = rest.find(isDong);
   return { lawdCds: found.codes, dong };
 }

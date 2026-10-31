@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { fetchAnnouncementAddress } from '@/lib/announcements';
 import { fetchApplyhomeDetail } from '@/lib/applyhomeDetail';
 import { resolveLawd } from '@/lib/lawdCode';
-import { estimateMarketPrice, parseUnitArea, type MarketEstimate } from '@/lib/marketPrice';
+import { estimateMarketPrice, parseUnitArea, type AptTrade, type MarketEstimate } from '@/lib/marketPrice';
 import { fetchRecentTrades, getRtmsKey } from '@/lib/rtms';
 
 export const maxDuration = 30;
@@ -41,10 +41,22 @@ export async function GET(request: Request) {
     }
 
     const now = new Date();
-    // 구가 생략된 시는 하위 구 전체를 조회해 합친다
-    const results = await Promise.all(target.lawdCds.map((code) => fetchRecentTrades(code, rtmsKey, now)));
-    const trades = results.flatMap((r) => r.trades);
-    const complete = results.every((r) => r.complete);
+    // 구가 생략된 시는 하위 구 전체를 합친다. 코드별로 차례로 불러 동시 호출 수를 6(개월) 이내로 유지하고,
+    // 일부 코드 실패는 건너뛴다(전부 실패하면 예외).
+    const trades: AptTrade[] = [];
+    let complete = true;
+    let lastError: unknown;
+    for (const code of target.lawdCds) {
+      try {
+        const r = await fetchRecentTrades(code, rtmsKey, now);
+        trades.push(...r.trades);
+        complete &&= r.complete;
+      } catch (error) {
+        complete = false;
+        lastError = error;
+      }
+    }
+    if (trades.length === 0 && lastError) throw lastError;
     const data: Record<string, MarketEstimate | null> = {};
     for (const area of areas) {
       data[String(area)] = estimateMarketPrice(trades, area, target.dong, now.getFullYear());
