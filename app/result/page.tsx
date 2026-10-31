@@ -18,6 +18,7 @@ import {
   scorePostBody,
   serializeSavedScore,
 } from '@/lib/scoreStorage';
+import { saveScoreToAccount } from '@/lib/scoreSync';
 import type { EligibilityInput, ScoreResult, SpecialSupplyEligibility, StoredScoreData } from '@/types';
 import type { SessionUser } from '@/types/auth';
 
@@ -25,7 +26,9 @@ function ResultContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [sessionUser, setSessionUser] = useState<SessionUser | null | undefined>(undefined);
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'expired' | 'failed'>('idle');
+  // "다시 시도"를 누를 때마다 올려 저장 effect를 다시 실행한다
+  const [saveAttempt, setSaveAttempt] = useState(0);
   const [lastScoreRaw, setLastScoreRaw] = useLocalStorageItem(LAST_SCORE_KEY);
   const [, setDraftRaw] = useLocalStorageItem(CALC_DRAFT_KEY);
   // 홈의 "결과 다시 보기"로 들어온 경우 새 계산이 아니므로 다시 저장하지 않는다
@@ -84,20 +87,14 @@ function ResultContent() {
 
   useEffect(() => {
     if (!data || fromSaved || !data.storable || sessionUser === undefined || sessionUser === null) return;
-    fetch('/api/scores', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: scorePostBody(data.input),
-    })
-      .then((res) => {
-        if (res.ok) {
-          setSaveStatus('saved');
-        } else {
-          setSaveStatus('error');
-        }
-      })
-      .catch(() => setSaveStatus('error'));
-  }, [data, fromSaved, sessionUser]);
+    let cancelled = false;
+    saveScoreToAccount(scorePostBody(data.input)).then((outcome) => {
+      if (!cancelled) setSaveStatus(outcome);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [data, fromSaved, sessionUser, saveAttempt]);
 
   if (!data) {
     return (
@@ -115,7 +112,12 @@ function ResultContent() {
       data={data}
       showDeviceSaved={sessionUser === null && savedOnDevice}
       showAccountSaved={!!sessionUser && saveStatus === 'saved'}
-      showSaveError={!!sessionUser && saveStatus === 'error'}
+      saveError={!sessionUser ? null : saveStatus === 'expired' || saveStatus === 'failed' ? saveStatus : null}
+      retrying={!!sessionUser && saveStatus === 'saving' && saveAttempt > 0}
+      onRetrySave={() => {
+        setSaveStatus('saving');
+        setSaveAttempt((n) => n + 1);
+      }}
       onRecalculate={() => router.push('/calculator')}
       onAnnouncements={() => router.push('/announcements')}
     />
@@ -168,14 +170,18 @@ function ResultView({
   data,
   showDeviceSaved,
   showAccountSaved,
-  showSaveError,
+  saveError,
+  retrying,
+  onRetrySave,
   onRecalculate,
   onAnnouncements,
 }: {
   data: { input: EligibilityInput; scoreResult: ScoreResult; specialSupply: SpecialSupplyEligibility };
   showDeviceSaved: boolean;
   showAccountSaved: boolean;
-  showSaveError: boolean;
+  saveError: 'expired' | 'failed' | null;
+  retrying: boolean;
+  onRetrySave: () => void;
   onRecalculate: () => void;
   onAnnouncements: () => void;
 }) {
@@ -290,9 +296,29 @@ function ResultView({
             <span className="text-sm text-gray-700">내 계정에 저장했어요</span>
           </div>
         )}
-        {showSaveError && (
-          <div className="mb-6 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-600">
-            계정에 저장하지 못했어요. 이 기기에는 저장돼 있어요.
+        {(saveError || retrying) && (
+          <div className="mb-6 flex items-center gap-3 rounded-2xl bg-gray-50 px-4 py-3">
+            <span className="text-sm text-gray-700">
+              {saveError === 'expired'
+                ? '로그인이 만료돼 계정에 저장하지 못했어요. 이 기기에는 저장돼 있어요.'
+                : '계정에 저장하지 못했어요. 이 기기에는 저장돼 있어요.'}
+            </span>
+            {saveError === 'expired' ? (
+              <a
+                href="/api/auth/kakao"
+                className="ml-auto whitespace-nowrap text-sm font-semibold text-blue-600 hover:underline"
+              >
+                다시 로그인
+              </a>
+            ) : (
+              <button
+                onClick={onRetrySave}
+                disabled={retrying}
+                className="ml-auto whitespace-nowrap text-sm font-semibold text-blue-600 hover:underline disabled:text-gray-400 disabled:no-underline"
+              >
+                {retrying ? '저장 중…' : '다시 시도'}
+              </button>
+            )}
           </div>
         )}
 

@@ -14,6 +14,7 @@ import {
   toStoredScoreData,
   type SavedScoreRecord,
 } from '@/lib/scoreStorage';
+import { saveScoreToAccount } from '@/lib/scoreSync';
 
 interface Props {
   isLoggedIn: boolean;
@@ -39,24 +40,14 @@ export default function LastScoreCard({ isLoggedIn, serverRecord, serverAvailabl
     if (!localRecord || syncing) return;
     setSyncing(true);
     setSyncError(null);
-    try {
-      const res = await fetch('/api/scores', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: scorePostBody(localRecord.input),
-      });
-      if (res.status === 401) {
-        setSyncError('expired');
-        setSyncing(false);
-        return;
-      }
-      if (!res.ok) throw new Error();
+    const outcome = await saveScoreToAccount(scorePostBody(localRecord.input));
+    if (outcome === 'saved') {
       // 서버 기록이 갱신돼 카드가 사라질 때까지 버튼을 잠가 중복 저장을 막는다
       router.refresh();
-    } catch {
-      setSyncError('failed');
-      setSyncing(false);
+      return;
     }
+    setSyncError(outcome);
+    setSyncing(false);
   };
 
   const handleDismissSync = () => {
