@@ -9,42 +9,20 @@ jobs:
     environment: prd
     env:
       PUBLIC_DATA_API_KEY: ${{ secrets.PUBLIC_DATA_API_KEY }}
-      KAKAO_CLIENT_ID: ${{ secrets.KAKAO_CLIENT_ID }}
-      KAKAO_REST_API_KEY: ${{ secrets.KAKAO_REST_API_KEY }}
-      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: "20" }
-      - name: Key shape (값은 출력하지 않음)
+      - name: RTMS 시군구 코드 검증 (202609 거래 건수 + 동 이름 샘플)
         run: |
-          k="$PUBLIC_DATA_API_KEY"
-          echo "PUBLIC_DATA_API_KEY len=${#k} has%=$([[ $k == *%* ]] && echo y || echo n) has+/==$([[ $k == *[+/=]* ]] && echo y || echo n)"
-          echo "KAKAO_REST_API_KEY set=$([ -n "$KAKAO_REST_API_KEY" ] && echo y || echo n) KAKAO_CLIENT_ID set=$([ -n "$KAKAO_CLIENT_ID" ] && echo y || echo n)"
-      - name: Raw API checks
-        run: |
-          set +e
-          RK="${KAKAO_REST_API_KEY:-$KAKAO_CLIENT_ID}"
-          echo "== RTMS raw key (평택 41220, 202609)"
-          curl -sS -m 20 "https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev?serviceKey=$PUBLIC_DATA_API_KEY&LAWD_CD=41220&DEAL_YMD=202609&numOfRows=1&pageNo=1" | head -c 600; echo
-          echo "== RTMS urlencoded key"
-          EK=$(python3 -c "import os,urllib.parse;print(urllib.parse.quote(os.environ['PUBLIC_DATA_API_KEY'],safe=''))")
-          curl -sS -m 20 "https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev?serviceKey=$EK&LAWD_CD=41220&DEAL_YMD=202609&numOfRows=1&pageNo=1" | head -c 600; echo
-          echo "== Kakao address"
-          curl -sS -m 10 -G "https://dapi.kakao.com/v2/local/search/address.json" --data-urlencode "query=경기도 평택시 세교동 725" -H "Authorization: KakaoAK $RK" -w "\nHTTP %{http_code}\n" | head -c 800; echo
-          echo "== Kakao coord2regioncode"
-          curl -sS -m 10 "https://dapi.kakao.com/v2/local/geo/coord2regioncode.json?x=127.08&y=37.02" -H "Authorization: KakaoAK $RK" -w "\nHTTP %{http_code}\n" | head -c 800; echo
-          echo "== odcloud 공고 검색 (지제역)"
-          curl -sS -m 20 -G "https://api.odcloud.kr/api/ApplyhomeInfoDetailSvc/v1/getAPTLttotPblancDetail?serviceKey=$PUBLIC_DATA_API_KEY" --data-urlencode "page=1" --data-urlencode "perPage=3" --data-urlencode "cond[HOUSE_NM::LIKE]=지제역" | python3 -c "import sys,json; d=json.load(sys.stdin); [print(i.get('HOUSE_MANAGE_NO'), i.get('PBLANC_NO'), i.get('HOUSE_NM'), i.get('HSSPLY_ADRES')) for i in d.get('data',[])]" | tee ids.txt
-      - name: End-to-end via app route
-        run: |
-          npm ci --silent
-          npm run build > /dev/null
-          npx next start -p 3000 > server.log 2>&1 &
-          sleep 8
-          read HM PB _ < ids.txt || true
-          echo "houseManageNo=$HM pblancNo=$PB"
-          curl -sS -m 60 "http://localhost:3000/api/announcements/market-price?houseManageNo=$HM&pblancNo=$PB" | head -c 2000; echo
-          echo "== detail location"
-          curl -sS -m 30 "http://localhost:3000/api/announcements/detail?houseManageNo=$HM&pblancNo=$PB" | python3 -c "import sys,json; d=json.load(sys.stdin).get('data',{}); print('location=',repr(d.get('location')),'units=',len(d.get('units',[])))"
-          echo "== server log"; tail -40 server.log
+          check() {
+            x=$(curl -sS -m 20 "https://apis.data.go.kr/1613000/RTMSDataSvcAptTradeDev/getRTMSDataSvcAptTradeDev?serviceKey=$PUBLIC_DATA_API_KEY&LAWD_CD=$1&DEAL_YMD=202609&numOfRows=1000&pageNo=1")
+            rc=$(echo "$x" | grep -o '<resultCode>[^<]*' | head -1 | cut -d'>' -f2)
+            tc=$(echo "$x" | grep -o '<totalCount>[^<]*' | cut -d'>' -f2)
+            dongs=$(echo "$x" | grep -o '<umdNm>[^<]*' | cut -d'>' -f2 | sort -u | head -6 | tr '\n' ',')
+            echo "CODE $1 rc=$rc total=$tc dongs=$dongs"
+          }
+          export -f check
+          xargs -P 6 -I{} bash -c 'check {}' < .github/diag-codes.txt | sort > result.txt
+          echo "== 거래 있는 코드: $(grep -vc 'total=0\|total=$' result.txt)"
+          grep -v 'rc=000' result.txt | head -5
+          grep -E 'CODE (4119|4159|281|282|27720|51|52)' result.txt | grep -v 'total=0 ' 
+          echo "== 거래 0건 (테이블 기준)"; grep 'total=0 ' result.txt | grep -vE 'CODE (281|282)' 
