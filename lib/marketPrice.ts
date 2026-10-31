@@ -26,7 +26,7 @@ export interface MarketEstimate {
   dong?: string;     // 같은 법정동 기준이면 동 이름, 없으면 시군구 전체
   newOnly: boolean;  // 10년 이내 준공 아파트만 비교했는지
   months: number;    // 조회 기간(개월)
-  medianBuildYear: number;         // 비교 단지 준공연도 중위값
+  medianBuildYear: number;         // 비교 단지 준공연도 중위값 (모르면 0)
   complexes: ComparableComplex[];  // 거래 많은 순 최대 5개
 }
 
@@ -148,7 +148,11 @@ export function estimateMarketPrice(
       dong: stage.dong,
       newOnly: stage.newOnly,
       months,
-      medianBuildYear: Math.round(median(picked.map((t) => t.buildYear))),
+      // 준공연도 누락(0)은 제외, 모두 누락이면 0
+      medianBuildYear: (() => {
+        const years = picked.map((t) => t.buildYear).filter((y) => y > 0);
+        return years.length ? Math.round(median(years)) : 0;
+      })(),
       complexes: summarizeComplexes(picked),
     };
   }

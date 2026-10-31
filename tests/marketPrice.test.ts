@@ -88,3 +88,13 @@ test('비교 단지를 거래 많은 순으로 최근 거래와 함께 요약한
     { name: 'B단지', dong: '홍파동', buildYear: 2021, area: 83, price: 88000, dealDate: '2026-08-01', count: 1 },
   ]);
 });
+
+test('준공연도 누락(0)은 중위값에서 빼고, 단지는 최대 5개·같은 건수면 최근 거래 순', () => {
+  const old = [t('홍파동', 84, 50000, 0, 'A'), t('홍파동', 84, 50000, 0, 'B'), t('홍파동', 84, 50000, 1995, 'C')];
+  assert.equal(estimateMarketPrice(old, 84, '홍파동', 2026)?.medianBuildYear, 1995);
+  assert.equal(estimateMarketPrice(old.slice(0, 2).concat(t('홍파동', 84, 1, 0, 'D')), 84, '홍파동', 2026)?.medianBuildYear, 0);
+
+  const many = ['A', 'B', 'C', 'D', 'E', 'F'].map((n, i) => t('홍파동', 84, 90000, 2020, n, `2026-0${i + 1}-01`));
+  const names = estimateMarketPrice(many, 84, '홍파동', 2026)?.complexes.map((c) => c.name);
+  assert.deepEqual(names, ['F', 'E', 'D', 'C', 'B']);
+});
