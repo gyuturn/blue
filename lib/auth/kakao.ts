@@ -73,3 +73,39 @@ export async function refreshAccessToken(refreshToken: string): Promise<RefreshR
     return { ok: false, kind: 'network' };
   }
 }
+
+const KAKAO_UNLINK_URL = 'https://kapi.kakao.com/v1/user/unlink';
+
+export type KakaoIdResult =
+  | { ok: true; id: string }
+  | { ok: false; kind: 'network' | 'api' };
+
+// 토큰으로 카카오 회원번호만 확인한다 — 위조 가능한 세션 쿠키 대신 본인 확인에 쓴다
+export async function verifyKakaoId(accessToken: string): Promise<KakaoIdResult> {
+  try {
+    const res = await fetch(KAKAO_USER_URL, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: 'no-store',
+    });
+    if (!res.ok) return { ok: false, kind: 'api' };
+    const data = (await res.json()) as KakaoUser;
+    if (data?.id === undefined || data?.id === null) return { ok: false, kind: 'api' };
+    return { ok: true, id: String(data.id) };
+  } catch {
+    return { ok: false, kind: 'network' };
+  }
+}
+
+// 카카오 계정과 서비스 연결 끊기. 성공 여부만 돌려준다
+export async function unlinkKakaoUser(accessToken: string): Promise<boolean> {
+  try {
+    const res = await fetch(KAKAO_UNLINK_URL, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: 'no-store',
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}

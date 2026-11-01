@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import type { SessionUser } from '@/types/auth';
 
 interface Props {
@@ -62,6 +63,14 @@ export default function UserProfileDropdown({ user }: Props) {
           >
             로그아웃
           </button>
+          <div className="my-1 border-t border-gray-100" />
+          <Link
+            href="/withdraw"
+            onClick={() => setOpen(false)}
+            className="block w-full px-4 py-2 text-left text-xs text-gray-400 hover:bg-gray-50 transition-colors"
+          >
+            회원탈퇴
+          </Link>
         </div>
       )}
     </div>
