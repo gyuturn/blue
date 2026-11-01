@@ -23,3 +23,7 @@ jobs:
           call ApplyhomeInfoCmpetRtSvc/v1/getAptLttotPblancScore ""
           call ApplyhomeInfoCmpetRtSvc/v1/getAPTLttotPblancScore ""
           call ApplyhomeInfoCmpetRtSvc/v1/getAPTLttotPblancCmpet "cond%5BHOUSE_MANAGE_NO%3A%3AEQ%5D=2026000201"
+          call NoSuchServiceXyz/v1/getNothing ""
+          echo "=== swagger 42105 paths ==="
+          curl -sS "https://infuser.odcloud.kr/api/stages/42105/api-docs" -o sw.json -w "HTTP %{http_code}\n"
+          jq -r '.info.title, (.paths | keys[])' sw.json 2>/dev/null | head -20 || head -c 800 sw.json
