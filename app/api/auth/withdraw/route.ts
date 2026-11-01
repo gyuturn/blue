@@ -96,7 +96,10 @@ export async function POST(request: NextRequest) {
     );
   }
   if (verified.id !== session.id) {
-    return error(403, 'mismatch', '로그인 정보가 맞지 않아요. 다시 로그인한 뒤 탈퇴해 주세요.');
+    return keepRefreshedTokens(
+      error(403, 'mismatch', '로그인 정보가 맞지 않아요. 다시 로그인한 뒤 탈퇴해 주세요.'),
+      token.refreshed,
+    );
   }
   const userId = verified.id;
 

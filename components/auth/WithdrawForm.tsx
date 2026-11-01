@@ -8,10 +8,13 @@ import { LEGACY_REGION_KEY } from '@/lib/regions';
 // 이 기기에 남은 개인 데이터 — 탈퇴 성공 후 함께 지운다
 const DEVICE_KEYS = [LAST_SCORE_KEY, CALC_DRAFT_KEY, SYNC_DISMISSED_KEY, 'blue_favorites', LEGACY_REGION_KEY];
 
+// 결과 화면이 탭 단위로 남기는 점수·입력값 (같은 탭에서 이동하므로 직접 지운다)
+const SESSION_KEYS = ['scoreData'];
+
 const DELETED_ITEMS = [
   '저장된 청약 가점 계산 기록',
   '즐겨찾기한 공고',
-  '이용약관·개인정보 처리방침 동의 기록',
+  '이 기기의 이용약관·개인정보 처리방침 동의 기록 (다시 로그인하면 새로 동의받아요)',
   '카카오 계정 연결 (다시 쓰려면 새로 가입해요)',
   '이 기기에 저장된 점수·입력 기록',
 ];
@@ -19,6 +22,7 @@ const DELETED_ITEMS = [
 function clearDeviceData() {
   try {
     for (const key of DEVICE_KEYS) window.localStorage.removeItem(key);
+    for (const key of SESSION_KEYS) window.sessionStorage.removeItem(key);
   } catch {
     // 저장소 접근이 막힌 환경 — 서버 쪽 삭제는 이미 끝났으므로 무시한다
   }
@@ -36,14 +40,20 @@ export default function WithdrawForm({ nickname }: { nickname: string }) {
     setErrorMessage(null);
     try {
       const res = await fetch('/api/auth/withdraw', { method: 'POST' });
-      const body = (await res.json().catch(() => null)) as { ok?: boolean; message?: string } | null;
+      const body = (await res.json().catch(() => null)) as
+        | { ok?: boolean; message?: string; kakaoUnlinked?: boolean }
+        | null;
       if (!res.ok || !body?.ok) {
         setErrorMessage(body?.message ?? '탈퇴 처리 중 문제가 생겼어요. 잠시 후 다시 시도해 주세요.');
         setLoading(false);
         return;
       }
       clearDeviceData();
-      alert('탈퇴가 완료됐어요. 그동안 이용해 주셔서 감사합니다.');
+      alert(
+        body.kakaoUnlinked === false
+          ? '탈퇴가 완료됐어요. 저장된 정보는 모두 삭제했어요.\n\n다만 카카오 계정 연결은 끊지 못했어요. 카카오톡 > 설정 > 카카오계정 > 연결된 서비스 관리에서 "청약블루"를 직접 연결 끊기 해 주세요.'
+          : '탈퇴가 완료됐어요. 그동안 이용해 주셔서 감사합니다.',
+      );
       window.location.href = '/';
     } catch {
       setErrorMessage('네트워크 연결을 확인한 뒤 다시 시도해 주세요.');
@@ -99,7 +109,7 @@ export default function WithdrawForm({ nickname }: { nickname: string }) {
         {loading ? '처리 중...' : '탈퇴하기'}
       </button>
       <button
-        onClick={() => router.back()}
+        onClick={() => (window.history.length > 1 ? router.back() : router.push('/'))}
         disabled={loading}
         className="mt-3 w-full py-2 text-sm text-gray-500 hover:text-gray-700"
       >
