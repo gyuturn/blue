@@ -7,9 +7,11 @@ const CACHE_SECONDS = 60 * 60 * 24 * 30;
 // /api/announcements* 접두사는 미들웨어(토큰 갱신 Set-Cookie)에서 제외되어 공개 캐시해도 안전하다 (#115)
 const OK_HEADERS = { 'Cache-Control': `public, s-maxage=${CACHE_SECONDS}` };
 const MISS_HEADERS = { 'Cache-Control': 'public, s-maxage=300' };
+const ERROR_HEADERS = { 'Cache-Control': 'no-store' };
 
-function respond(region: string | null) {
-  return NextResponse.json({ region }, { headers: region ? OK_HEADERS : MISS_HEADERS });
+// error: 카카오 오류·timeout·키 없음 → 같은 동네 사용자에게 실패가 퍼지지 않도록 캐시하지 않는다
+function respond(region: string | null, error = false) {
+  return NextResponse.json({ region }, { headers: error ? ERROR_HEADERS : region ? OK_HEADERS : MISS_HEADERS });
 }
 
 // 국내 좌표 범위 (밖이면 카카오를 호출하지 않는다)
@@ -27,7 +29,7 @@ export async function GET(request: Request) {
   }
 
   const restKey = getKakaoRestKey();
-  if (!restKey) return respond(null);
+  if (!restKey) return respond(null, true);
 
   const x = lng.toFixed(2);
   const y = lat.toFixed(2);
@@ -39,13 +41,13 @@ export async function GET(request: Request) {
     });
     if (!res.ok) {
       console.warn(`[location] coord2regioncode ${res.status}`);
-      return respond(null);
+      return respond(null, true);
     }
     const json = (await res.json()) as { documents?: { region_type: string; region_1depth_name?: string }[] };
     const doc = json.documents?.find((d) => d.region_type === 'B') ?? json.documents?.[0];
     return respond(toRegionOption(doc?.region_1depth_name));
   } catch (error) {
     console.warn('[location] coord2regioncode failed', error instanceof Error ? error.message : error);
-    return respond(null);
+    return respond(null, true);
   }
 }

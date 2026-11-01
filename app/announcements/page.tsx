@@ -177,6 +177,8 @@ export default function AnnouncementsPage() {
   // fromButton: 사용자가 [위치 허용]을 눌렀으면 칩 선택 여부와 상관없이 내 시/도로 바꾸고, 실패 이유를 알려준다
   const locateUser = async (fromButton: boolean) => {
     const startedAt = Date.now();
+    // 버튼으로 요청하면 그 전의 칩 선택은 무시하되, 확인 중에 다시 칩을 누르면 그 선택을 존중한다
+    if (fromButton) regionTouchedRef.current = false;
     setLocationStatus('locating');
     const fail = (denied: boolean) => {
       if (!fromButton) {
@@ -202,7 +204,7 @@ export default function AnnouncementsPage() {
       setUserRegion(region);
       setLocationStatus('ready');
       const inTime = Date.now() - startedAt <= AUTO_APPLY_WINDOW_MS;
-      if (fromButton || (inTime && !regionTouchedRef.current)) setSelectedRegion(region);
+      if (!regionTouchedRef.current && (fromButton || inTime)) setSelectedRegion(region);
     } catch (error) {
       fail(error instanceof LocationDeniedError);
     }
