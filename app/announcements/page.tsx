@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import Disclaimer from '@/components/Disclaimer';
@@ -18,13 +18,22 @@ import { getMapSearchUrl } from '@/lib/maps';
 import { KAKAO_JS_KEY } from '@/lib/kakaoMaps';
 import { readLocalStorage, useLocalStorageItem } from '@/hooks/useLocalStorage';
 import { hasDeviceScore } from '@/lib/home';
-import { INITIAL_REGION, LEGACY_REGION_KEY, REGION_OPTIONS, getRegionQuery } from '@/lib/regions';
+import { ALL_REGION, INITIAL_REGION, LEGACY_REGION_KEY, REGION_OPTIONS, getRegionQuery } from '@/lib/regions';
+import { LocationDeniedError, fetchUserRegion, getLocationPermission, getUserPosition, type UserPosition } from '@/lib/userLocation';
 import { LAST_SCORE_KEY, isEligibilityInput, parseSavedScore, toStoredScoreData } from '@/lib/scoreStorage';
 import { parseUnitArea, type MarketEstimate } from '@/lib/marketPrice';
 import { CompetitionHistory } from '@/components/announcements/CompetitionHistory';
 
 const AnnouncementMap = dynamic(() => import('@/components/announcements/AnnouncementMap'), { ssr: false });
 const MAP_ENABLED = !!KAKAO_JS_KEY;
+const LOCATION_DISMISSED_KEY = 'location_banner_dismissed';
+
+// 자동 확인 결과가 이보다 늦으면 이미 보고 있는 화면을 바꾸지 않는다
+const AUTO_APPLY_WINDOW_MS = 5000;
+
+// idle: 확인 전 / prompt: 허용 안내 / locating: 확인 중 / ready: 내 시·도 확인됨
+// failed: 버튼으로 요청했는데 실패(안내 표시) / unavailable: 거부·실패(조용히 전체 공고)
+type LocationStatus = 'idle' | 'prompt' | 'locating' | 'ready' | 'failed' | 'unavailable';
 
 function formatPriceKorean(raw: string): string {
   const num = parseInt(raw.replace(/,/g, ''), 10);
@@ -60,6 +69,12 @@ export default function AnnouncementsPage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRegion, setSelectedRegion] = useState(INITIAL_REGION);
+  // 사용자가 지역 칩을 직접 고르면 위치 결과로 덮어쓰지 않는다 (#137)
+  const regionTouchedRef = useRef(false);
+  const [locationStatus, setLocationStatus] = useState<LocationStatus>('idle');
+  const [userRegion, setUserRegion] = useState<string | null>(null);
+  const [userPosition, setUserPosition] = useState<UserPosition | null>(null);
+  const [locationFailReason, setLocationFailReason] = useState<'denied' | 'error' | null>(null);
   const [isMock, setIsMock] = useState(false);
   const [hideExpired, setHideExpired] = useState(true);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
@@ -136,21 +151,95 @@ export default function AnnouncementsPage() {
   }, [router]);
 
   useEffect(() => {
+    // 위치로 지역이 바로 바뀌므로, 늦게 도착한 이전 지역 응답이 새 결과를 덮어쓰지 않게 한다
+    let cancelled = false;
     const fetchData = async () => {
       setLoading(true);
       try {
         const res = await fetch(`/api/announcements${getRegionQuery(selectedRegion)}`);
         const json = await res.json();
+        if (cancelled) return;
         setAnnouncements(json.data ?? []);
         setIsMock(json.isMock ?? false);
       } catch {
-        setAnnouncements([]);
+        if (!cancelled) setAnnouncements([]);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     fetchData();
+    return () => {
+      cancelled = true;
+    };
   }, [selectedRegion]);
+
+  // 위치 확인 → 내 시/도 (#137). 실패하면 전체 공고 그대로
+  // fromButton: 사용자가 [위치 허용]을 눌렀으면 칩 선택 여부와 상관없이 내 시/도로 바꾸고, 실패 이유를 알려준다
+  const locateUser = async (fromButton: boolean) => {
+    const startedAt = Date.now();
+    // 버튼으로 요청하면 그 전의 칩 선택은 무시하되, 확인 중에 다시 칩을 누르면 그 선택을 존중한다
+    if (fromButton) regionTouchedRef.current = false;
+    setLocationStatus('locating');
+    const fail = (denied: boolean) => {
+      if (!fromButton) {
+        setLocationStatus('unavailable');
+        return;
+      }
+      setLocationFailReason(denied ? 'denied' : 'error');
+      setLocationStatus('failed');
+      try {
+        sessionStorage.setItem(LOCATION_DISMISSED_KEY, '1');
+      } catch {
+        // 저장소 접근이 막힌 환경은 무시
+      }
+    };
+    try {
+      const position = await getUserPosition();
+      setUserPosition(position);
+      const region = await fetchUserRegion(position);
+      if (!region) {
+        fail(false);
+        return;
+      }
+      setUserRegion(region);
+      setLocationStatus('ready');
+      const inTime = Date.now() - startedAt <= AUTO_APPLY_WINDOW_MS;
+      if (!regionTouchedRef.current && (fromButton || inTime)) setSelectedRegion(region);
+    } catch (error) {
+      fail(error instanceof LocationDeniedError);
+    }
+  };
+
+  // 진입 시: 이미 허용했으면 바로 확인, 아직이면 안내 배너
+  useEffect(() => {
+    let cancelled = false;
+    getLocationPermission().then((permission) => {
+      if (cancelled) return;
+      if (permission === 'granted') {
+        locateUser(false);
+        return;
+      }
+      let dismissed = false;
+      try {
+        dismissed = sessionStorage.getItem(LOCATION_DISMISSED_KEY) === '1';
+      } catch {
+        // 저장소 접근이 막힌 환경은 무시
+      }
+      setLocationStatus(permission === 'prompt' && !dismissed ? 'prompt' : 'unavailable');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const dismissLocationBanner = () => {
+    try {
+      sessionStorage.setItem(LOCATION_DISMISSED_KEY, '1');
+    } catch {
+      // 저장소 접근이 막힌 환경은 무시
+    }
+    setLocationStatus('unavailable');
+  };
 
   // 지도 탭이 다시 그려질 때 범위가 초기화되지 않도록 배열을 고정한다
   const baseAnnouncements = useMemo(
@@ -269,20 +358,20 @@ export default function AnnouncementsPage() {
         {/* 전체 / 즐겨찾기 탭 */}
         <div className="flex gap-2 mb-4">
           <button
-            onClick={() => setActiveTab('all')}
+            onClick={() => { regionTouchedRef.current = true; setActiveTab('all'); }}
             className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all ${activeTab === 'all' ? 'bg-blue-600 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}
           >
             전체 공고
           </button>
           <button
-            onClick={() => setActiveTab('favorites')}
+            onClick={() => { regionTouchedRef.current = true; setActiveTab('favorites'); }}
             className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-1 ${activeTab === 'favorites' ? 'bg-red-500 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}
           >
             <span>♥</span> 즐겨찾기 {favoriteIds.length > 0 && <span className={`text-xs px-1.5 py-0.5 rounded-full ${activeTab === 'favorites' ? 'bg-white/20' : 'bg-red-100 text-red-500'}`}>{favoriteIds.length}</span>}
           </button>
           {MAP_ENABLED && (
             <button
-              onClick={() => setActiveTab('map')}
+              onClick={() => { regionTouchedRef.current = true; setActiveTab('map'); }}
               className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-1 ${activeTab === 'map' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}
             >
               <span aria-hidden>🗺</span> 지도
@@ -290,10 +379,50 @@ export default function AnnouncementsPage() {
           )}
         </div>
 
+        {/* 위치 허용 안내 (#137) */}
+        {locationStatus === 'prompt' && (
+          <div className="flex items-center justify-between gap-2 bg-white border border-blue-200 rounded-xl px-4 py-3 mb-4">
+            <p className="text-sm text-gray-700">📍 내 위치 기준으로 공고를 볼까요?</p>
+            <div className="flex flex-shrink-0 items-center gap-2">
+              <button onClick={dismissLocationBanner} className="text-xs text-gray-400">
+                다음에
+              </button>
+              <button
+                onClick={() => locateUser(true)}
+                className="text-xs font-semibold text-white bg-blue-600 px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                위치 허용
+              </button>
+            </div>
+          </div>
+        )}
+
+        {locationStatus === 'failed' && (
+          <p className="text-xs text-gray-500 mb-3">
+            {locationFailReason === 'denied'
+              ? '📍 위치 권한이 꺼져 있어요. 브라우저 설정에서 위치 권한을 켜면 내 지역 공고를 먼저 볼 수 있어요.'
+              : '📍 위치를 확인하지 못해 전체 공고를 보여드려요.'}
+          </p>
+        )}
+
         {/* Region Filter & Expired Toggle */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-semibold text-gray-500">지역 필터</p>
+            <div className="flex items-center gap-2">
+              <p className="text-xs font-semibold text-gray-500">지역 필터</p>
+              {locationStatus === 'locating' && <span className="text-xs text-gray-400">📍 위치 확인 중…</span>}
+              {locationStatus === 'ready' && userRegion && (
+                <button
+                  onClick={() => {
+                    regionTouchedRef.current = true;
+                    setSelectedRegion(userRegion);
+                  }}
+                  className="text-xs font-medium text-blue-600"
+                >
+                  📍 내 위치: {userRegion}
+                </button>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-500">마감 포함</span>
               <button
@@ -308,7 +437,10 @@ export default function AnnouncementsPage() {
             {REGION_OPTIONS.map((region) => (
               <button
                 key={region}
-                onClick={() => setSelectedRegion(region)}
+                onClick={() => {
+                  regionTouchedRef.current = true;
+                  setSelectedRegion(region);
+                }}
                 className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   selectedRegion === region
                     ? 'bg-blue-600 text-white shadow-sm'
@@ -347,6 +479,7 @@ export default function AnnouncementsPage() {
             region={selectedRegion}
             announcements={baseAnnouncements}
             onOpenDetail={setSelectedAnnouncement}
+            userPosition={userPosition}
           />
         ) : loading ? (
           <div className="space-y-3">
@@ -367,7 +500,22 @@ export default function AnnouncementsPage() {
               <>
                 <div className="text-4xl mb-3">♡</div>
                 <p className="text-gray-500 font-medium">즐겨찾기한 공고가 없어요</p>
-                <p className="text-gray-400 text-sm mt-1">마음에 드는 공고의 하트를 눌러보세요</p>
+                <p className="text-gray-400 text-sm mt-1">
+                  {selectedRegion !== ALL_REGION
+                    ? `${selectedRegion} 공고 중에는 즐겨찾기가 없어요`
+                    : '마음에 드는 공고의 하트를 눌러보세요'}
+                </p>
+                {selectedRegion !== ALL_REGION && favoriteIds.length > 0 && (
+                  <button
+                    onClick={() => {
+                      regionTouchedRef.current = true;
+                      setSelectedRegion(ALL_REGION);
+                    }}
+                    className="mt-4 text-sm font-semibold text-blue-600 underline"
+                  >
+                    전체 지역 즐겨찾기 보기
+                  </button>
+                )}
               </>
             ) : (
               <>
@@ -378,6 +526,17 @@ export default function AnnouncementsPage() {
                 </div>
                 <p className="text-gray-500 font-medium">해당 지역 공고가 없습니다</p>
                 <p className="text-gray-400 text-sm mt-1">다른 지역을 선택해 보세요</p>
+                {selectedRegion !== ALL_REGION && (
+                  <button
+                    onClick={() => {
+                      regionTouchedRef.current = true;
+                      setSelectedRegion(ALL_REGION);
+                    }}
+                    className="mt-4 text-sm font-semibold text-blue-600 underline"
+                  >
+                    전체 지역 공고 보기
+                  </button>
+                )}
               </>
             )}
           </div>
