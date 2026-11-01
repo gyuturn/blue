@@ -6,7 +6,7 @@ export const metadata: Metadata = {
 };
 
 export default function PrivacyPage() {
-  const lastUpdated = '2026년 4월 16일';
+  const lastUpdated = '2026년 11월 1일';
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -127,7 +127,12 @@ export default function PrivacyPage() {
               <li>개인정보 처리 정지 요청</li>
             </ul>
             <p className="text-gray-500 text-xs mt-3">
-              권리 행사는 서비스 내 카카오 로그아웃 후 계정 삭제, 또는 아래 문의처로 연락해 주세요.
+              로그인 후 오른쪽 위 프로필 메뉴 → <span className="font-medium text-gray-700">회원탈퇴</span>에서
+              직접 탈퇴할 수 있으며, 그 밖의 요청은 아래 문의처로 연락해 주세요.
+            </p>
+            <p className="text-gray-500 text-xs mt-2">
+              탈퇴하면 가점 계산 이력, 즐겨찾기, 이용약관·개인정보 처리방침 동의 기록, 로그인 정보가
+              지체 없이 삭제되며 카카오 계정과의 연결도 해제됩니다. 삭제된 정보는 복구할 수 없습니다.
             </p>
           </section>
 
