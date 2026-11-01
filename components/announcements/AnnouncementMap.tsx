@@ -7,11 +7,13 @@ import { getDday, getDdayBadgeStyle } from '@/lib/announcements';
 import { loadKakaoMaps } from '@/lib/kakaoMaps';
 import type { KakaoMap, KakaoMapsApi } from '@/lib/kakaoMaps';
 import { getRegionQuery } from '@/lib/regions';
+import type { UserPosition } from '@/lib/userLocation';
 
 interface AnnouncementMapProps {
   region: string; // 바뀌면 부모가 key로 다시 마운트한다
   announcements: Announcement[];
   onOpenDetail: (announcement: Announcement) => void;
+  userPosition?: UserPosition | null; // 내 위치 (#137)
 }
 
 const KOREA_CENTER = { lat: 36.35, lng: 127.8 };
@@ -27,6 +29,13 @@ function pinLabel(a: Announcement): string {
   if (a.status === '마감') return '마감';
   const dday = getDday(a.subscriptionStartDate, a.subscriptionEndDate);
   return dday && dday !== '마감' ? dday : '예정';
+}
+
+function createUserDot(): HTMLElement {
+  const el = document.createElement('div');
+  el.setAttribute('aria-label', '내 위치');
+  el.className = 'w-4 h-4 rounded-full bg-blue-500 border-[3px] border-white shadow-[0_0_0_6px_rgba(59,130,246,0.25)]';
+  return el;
 }
 
 function createPin(a: Announcement, selected: boolean, onClick: () => void): HTMLElement {
@@ -47,7 +56,7 @@ function createPin(a: Announcement, selected: boolean, onClick: () => void): HTM
 
 type CoordsState = { status: 'loading' } | { status: 'ready'; data: Record<string, LatLng> } | { status: 'error' };
 
-export default function AnnouncementMap({ region, announcements, onOpenDetail }: AnnouncementMapProps) {
+export default function AnnouncementMap({ region, announcements, onOpenDetail, userPosition }: AnnouncementMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [maps, setMaps] = useState<KakaoMapsApi | null>(null);
   const [map, setMap] = useState<KakaoMap | null>(null);
@@ -103,9 +112,16 @@ export default function AnnouncementMap({ region, announcements, onOpenDetail }:
   const unlocatedCount = coords.status === 'ready' ? announcements.length - located.length : 0;
   const selected = located.find((p) => p.announcement.id === selectedId)?.announcement ?? null;
 
-  // 핀이 바뀌면 전체 핀이 보이게 범위 조정
+  // 핀이 바뀌면 전체 핀이 보이게 범위 조정 (핀이 없으면 내 위치 중심)
   useEffect(() => {
-    if (!maps || !map || located.length === 0) return;
+    if (!maps || !map) return;
+    if (located.length === 0) {
+      if (userPosition && coords.status !== 'loading') {
+        map.setCenter(new maps.LatLng(userPosition.lat, userPosition.lng));
+        map.setLevel(8);
+      }
+      return;
+    }
     if (located.length === 1) {
       const { lat, lng } = located[0].position;
       map.setCenter(new maps.LatLng(lat, lng));
@@ -115,7 +131,26 @@ export default function AnnouncementMap({ region, announcements, onOpenDetail }:
     const bounds = new maps.LatLngBounds();
     located.forEach(({ position }) => bounds.extend(new maps.LatLng(position.lat, position.lng)));
     map.setBounds(bounds, 48, 32, 32, 32);
-  }, [maps, map, located]);
+  }, [maps, map, located, userPosition, coords.status]);
+
+  // 내 위치 점
+  useEffect(() => {
+    if (!maps || !map || !userPosition) return;
+    const dot = new maps.CustomOverlay({
+      position: new maps.LatLng(userPosition.lat, userPosition.lng),
+      content: createUserDot(),
+      yAnchor: 0.5,
+      zIndex: 5,
+    });
+    dot.setMap(map);
+    return () => dot.setMap(null);
+  }, [maps, map, userPosition]);
+
+  const moveToUser = () => {
+    if (!maps || !map || !userPosition) return;
+    map.setCenter(new maps.LatLng(userPosition.lat, userPosition.lng));
+    map.setLevel(7);
+  };
 
   // 핀 그리기 (선택 상태가 바뀌면 다시 그린다)
   useEffect(() => {
@@ -167,6 +202,15 @@ export default function AnnouncementMap({ region, announcements, onOpenDetail }:
           <div className="absolute inset-x-4 top-4 rounded-xl bg-white/95 px-4 py-3 text-center text-xs text-gray-600 shadow">
             지도에 표시할 공고가 없어요
           </div>
+        )}
+        {map && userPosition && (
+          <button
+            type="button"
+            onClick={moveToUser}
+            className="absolute bottom-3 right-3 z-10 rounded-full bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-md"
+          >
+            📍 내 위치
+          </button>
         )}
         {map && coords.status === 'error' && (
           <div className="absolute inset-x-4 top-4 rounded-xl bg-white/95 px-4 py-3 text-center text-xs text-gray-600 shadow">
