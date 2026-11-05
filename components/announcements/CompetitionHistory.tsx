@@ -144,9 +144,22 @@ export function CompetitionHistory({
           <p className="text-[11px] text-gray-500 mb-2">
             최근 {data.months}개월 {data.region} 민영 {data.complexCount}개 단지 결과 기준
           </p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-gray-500 mb-2">
+            {myScore !== undefined && (
+              <span className="flex items-center gap-1">
+                <span className="inline-block h-2.5 w-2.5 rounded-full bg-orange-500" />내 가점 {myScore}점
+              </span>
+            )}
+            <span className="flex items-center gap-1">
+              <span className="inline-block h-2.5 w-0.5 bg-blue-500" />당첨선 중앙값
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block h-2 w-4 rounded-full bg-blue-100" />당첨선 범위
+            </span>
+          </div>
           <div className="space-y-3">
             {data.stats.map((s) => (
-              <BucketRow key={s.bucket} stats={s} myScore={judgeable ? myScore : undefined} />
+              <BucketRow key={s.bucket} stats={s} myScore={myScore} judge={judgeable} />
             ))}
           </div>
         </div>
@@ -176,15 +189,17 @@ export function CompetitionHistory({
   );
 }
 
-function BucketRow({ stats, myScore }: { stats: BucketStats; myScore?: number }) {
+// myScore는 막대 위치 표시용, judge는 판정 칩·문구 표시 여부 (공공분양은 가점제가 아니라 위치만 보여준다)
+function BucketRow({ stats, myScore, judge }: { stats: BucketStats; myScore?: number; judge: boolean }) {
   const chance = myScore !== undefined ? judgeChance(myScore, stats) : null;
+  const markerScore = myScore !== undefined ? Math.min(Math.max(myScore, 0), MAX_SCORE) : undefined;
   const pct = (n: number) => `${(n / MAX_SCORE) * 100}%`;
 
   return (
     <div>
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-semibold text-gray-800">{AREA_BUCKET_LABEL[stats.bucket]}</span>
-        {chance && (
+        {judge && chance && (
           <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${CHANCE_META[chance.level].style}`}>
             {CHANCE_META[chance.level].label}
           </span>
@@ -208,15 +223,31 @@ function BucketRow({ stats, myScore }: { stats: BucketStats; myScore?: number })
           style={{ left: pct(stats.lowestMin), width: pct(stats.lowestMax - stats.lowestMin) }}
         />
         <div className="absolute h-2 w-0.5 bg-blue-500" style={{ left: pct(stats.lowestMedian) }} />
-        {myScore !== undefined && (
+        {markerScore !== undefined && (
           <div
             className="absolute -top-0.5 h-3 w-3 -translate-x-1/2 rounded-full border-2 border-white bg-orange-500 shadow"
-            style={{ left: pct(Math.min(myScore, MAX_SCORE)) }}
+            style={{ left: pct(markerScore) }}
           />
         )}
       </div>
+      <div className="relative mt-0.5 h-3.5 text-[10px] text-gray-400">
+        {!(markerScore !== undefined && markerScore < 12) && <span className="absolute left-0">0</span>}
+        {!(markerScore !== undefined && markerScore > 72) && <span className="absolute right-0">84점</span>}
+        {markerScore !== undefined && (
+          // 양끝에서는 라벨이 잘리지 않도록 정렬 기준을 바꾼다
+          <span
+            className={`absolute whitespace-nowrap font-semibold text-orange-600 ${
+              markerScore < 12 ? '' : markerScore > 72 ? '-translate-x-full' : '-translate-x-1/2'
+            }`}
+            style={{ left: pct(markerScore) }}
+          >
+            내 {myScore}점
+          </span>
+        )}
+      </div>
       {chance && myScore !== undefined && (
-        <p className="text-[11px] text-gray-500 mt-1">
+        <p className="text-[11px] text-gray-500 mt-0.5">
+          {judge ? '' : '참고: 민영 기준으로 보면 '}
           {chance.total}개 단지 중 {chance.passCount}곳은 내 가점({myScore}점)으로 당첨권인 주택형이 있었어요
         </p>
       )}
