@@ -99,3 +99,9 @@ test('1 미만 경쟁률은 미달로 표시한다', () => {
   assert.equal(formatCompetitionRate(1), '1 : 1');
   assert.equal(formatCompetitionRate(64.4), '64.4 : 1');
 });
+
+test('미달 중앙값은 반올림으로 1이 되지 않는다', () => {
+  const u = (supply: number, requests: number): UnitResult => ({ ...unit(59, 40, supply, requests) });
+  const [stats] = buildBucketStats([[u(100, 96)], [u(100, 97)], [u(100, 98)]]);
+  assert.equal(stats.rateMedian, 0.9);
+});

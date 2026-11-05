@@ -7,8 +7,8 @@ import type { Announcement, StoredScoreData } from '@/types';
 import {
   AREA_BUCKET_LABEL,
   CHANCE_META,
-  getChanceSuggestions,
   formatCompetitionRate,
+  getChanceSuggestions,
   judgeChance,
   passedUnits,
   type BucketStats,
@@ -92,7 +92,7 @@ export function CompetitionHistory({
         과거 당첨선으로 본 내 가능성{' '}
         <Tooltip
           term="최저 당첨가점"
-          definition="가점제로 당첨된 사람 중 가장 낮은 점수예요. 내 가점이 이 점수 이상이면 그 주택형에서 당첨권이었다는 뜻이에요. 면적대별 통계는 단지마다 당첨선이 가장 낮았던 주택형 기준이에요. 경쟁률은 1순위 해당지역 신청자 수 ÷ 공급 세대수이고, 미달은 신청자가 공급 세대보다 적었다는 뜻이에요."
+          definition="가점제로 당첨된 사람 중 가장 낮은 점수예요. 내 가점이 이 점수 이상이면 그 주택형에서 당첨권이었다는 뜻이에요. 면적대별 통계는 단지마다 당첨선이 가장 낮았던 주택형 기준이에요. 경쟁률은 1순위 해당지역 신청자 수 ÷ 공급 세대수이고, 미달은 1순위 해당지역 신청자가 공급 세대보다 적었다는 뜻이에요(기타지역·2순위에서 채워졌을 수 있어요)."
         >
           <span className="text-blue-400 font-normal">ⓘ</span>
         </Tooltip>
@@ -116,7 +116,12 @@ export function CompetitionHistory({
                   className={`rounded-lg px-2.5 py-1.5 text-[11px] ${passed ? 'bg-green-50 text-green-800' : 'bg-gray-50 text-gray-600'}`}
                 >
                   <span className="font-semibold text-gray-800">{u.houseType}</span>
-                  <span className="ml-2">경쟁률 {formatRate(u)}</span>
+                  <span className="ml-2">
+                    경쟁률{' '}
+                    <span className={(u.rate !== null && u.rate < 1) || u.shortfall !== null ? 'font-semibold text-green-600' : undefined}>
+                      {formatRate(u)}
+                    </span>
+                  </span>
                   {u.lowest !== null && (
                     <span className="ml-2">
                       당첨가점 최저 {u.lowest}
