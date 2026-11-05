@@ -104,6 +104,11 @@ export function buildUnitResults(
   });
 }
 
+// 1 미만이면 신청자가 공급보다 적었던 것이라 비율 대신 '미달'로 보여준다
+export function formatCompetitionRate(rate: number): string {
+  return rate < 1 ? '미달' : `${rate.toLocaleString()} : 1`;
+}
+
 export function areaBucket(area: number): AreaBucket {
   if (area <= 60) return 'small';
   if (area <= 85) return 'mid';
@@ -117,6 +122,8 @@ function median(values: number[]): number {
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
+// 0.96처럼 미달인 값이 반올림으로 1이 되어 '1 : 1'로 보이지 않도록 1 미만은 내림
+const roundRate = (n: number) => (n < 1 ? Math.floor(n * 10) / 10 : round1(n));
 
 // 단지별·면적대별 대표값(가장 낮았던 당첨선, 1순위 경쟁률)을 모아 면적대 통계를 만든다
 export function buildBucketStats(complexes: UnitResult[][]): BucketStats[] {
@@ -140,7 +147,7 @@ export function buildBucketStats(complexes: UnitResult[][]): BucketStats[] {
       lowestMedian: round1(median(lowestScores)),
       lowestMin: lowestScores[0],
       lowestMax: lowestScores[lowestScores.length - 1],
-      rateMedian: rates.length > 0 ? round1(median(rates)) : null,
+      rateMedian: rates.length > 0 ? roundRate(median(rates)) : null,
       lowestScores,
     }];
   });

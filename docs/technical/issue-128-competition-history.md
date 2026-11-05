@@ -41,6 +41,7 @@ Base: `https://api.odcloud.kr/api/ApplyhomeInfoCmpetRtSvc/v1`
    - ≥ 70% 가능성 높음 / ≥ 40% 도전해볼 만함 / > 0 쉽지 않음 / 0 가점제로는 어려움
    - 법정 기준 아님 → 참고용 문구 필수
 6. `getChanceSuggestions` — 판정·특공 자격·면적대별 결과로 제안 문구 (85㎡ 초과 추첨 물량, 특별공급, 비규제지역 등)
+7. `formatCompetitionRate` — 1 미만은 `미달`, 그 외 `12.4 : 1` (#141)
 
 ## API 응답
 ```json
