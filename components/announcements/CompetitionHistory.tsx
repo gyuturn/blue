@@ -8,6 +8,7 @@ import {
   AREA_BUCKET_LABEL,
   CHANCE_META,
   getChanceSuggestions,
+  formatCompetitionRate,
   judgeChance,
   passedUnits,
   type BucketStats,
@@ -53,7 +54,7 @@ function useCompetitionHistory(houseManageNo: string, region: string): HistorySt
 }
 
 const formatRate = (u: UnitResult) =>
-  u.rate !== null ? `${u.rate.toLocaleString()} : 1` : u.shortfall !== null ? `미달 ${u.shortfall}세대` : '-';
+  u.rate !== null ? formatCompetitionRate(u.rate) : u.shortfall !== null ? `미달 ${u.shortfall}세대` : '-';
 
 // 과거 당첨선으로 본 내 가능성 — 이 공고 실제 결과(마감 시) + 같은 시·도 최근 1년 민영 단지 당첨선
 export function CompetitionHistory({
@@ -91,7 +92,7 @@ export function CompetitionHistory({
         과거 당첨선으로 본 내 가능성{' '}
         <Tooltip
           term="최저 당첨가점"
-          definition="가점제로 당첨된 사람 중 가장 낮은 점수예요. 내 가점이 이 점수 이상이면 그 주택형에서 당첨권이었다는 뜻이에요. 면적대별 통계는 단지마다 당첨선이 가장 낮았던 주택형 기준이에요. 경쟁률은 1순위 해당지역 신청자 수 ÷ 공급 세대수예요."
+          definition="가점제로 당첨된 사람 중 가장 낮은 점수예요. 내 가점이 이 점수 이상이면 그 주택형에서 당첨권이었다는 뜻이에요. 면적대별 통계는 단지마다 당첨선이 가장 낮았던 주택형 기준이에요. 경쟁률은 1순위 해당지역 신청자 수 ÷ 공급 세대수이고, 미달은 신청자가 공급 세대보다 적었다는 뜻이에요."
         >
           <span className="text-blue-400 font-normal">ⓘ</span>
         </Tooltip>
@@ -186,7 +187,14 @@ function BucketRow({ stats, myScore }: { stats: BucketStats; myScore?: number })
       </div>
       <p className="text-[11px] text-gray-600 mt-0.5">
         최저 당첨가점 {stats.lowestMedian}점 ({stats.lowestMin}~{stats.lowestMax})
-        {stats.rateMedian !== null && ` · 경쟁률 ${stats.rateMedian.toLocaleString()} : 1`}
+        {stats.rateMedian !== null && (
+          <>
+            {' · 경쟁률 '}
+            <span className={stats.rateMedian < 1 ? 'font-semibold text-green-600' : undefined}>
+              {formatCompetitionRate(stats.rateMedian)}
+            </span>
+          </>
+        )}
         <span className="text-gray-400"> · {stats.complexCount}개 단지</span>
       </p>
       <div className="relative mt-1.5 h-2 rounded-full bg-gray-100" aria-hidden>

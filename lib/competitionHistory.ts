@@ -104,6 +104,11 @@ export function buildUnitResults(
   });
 }
 
+// 1 미만이면 신청자가 공급보다 적었던 것이라 비율 대신 '미달'로 보여준다
+export function formatCompetitionRate(rate: number): string {
+  return rate < 1 ? '미달' : `${rate.toLocaleString()} : 1`;
+}
+
 export function areaBucket(area: number): AreaBucket {
   if (area <= 60) return 'small';
   if (area <= 85) return 'mid';

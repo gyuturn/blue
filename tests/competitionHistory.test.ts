@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   buildBucketStats,
   buildUnitResults,
+  formatCompetitionRate,
   getChanceSuggestions,
   judgeChance,
   parseCompetitionRate,
@@ -90,4 +91,11 @@ test('빈 데이터·경계값·면적 없는 주택형을 안전하게 처리�
   const edges = buildBucketStats([[unit(60, 30), unit(85, 40), unit(85.01, 50)]]);
   assert.deepEqual(edges.map((s) => [s.bucket, s.lowestMin]), [['small', 30], ['mid', 40], ['large', 50]]);
   assert.deepEqual(getChanceSuggestions(50, []), []);
+});
+
+test('1 미만 경쟁률은 미달로 표시한다', () => {
+  assert.equal(formatCompetitionRate(0.5), '미달');
+  assert.equal(formatCompetitionRate(0), '미달');
+  assert.equal(formatCompetitionRate(1), '1 : 1');
+  assert.equal(formatCompetitionRate(64.4), '64.4 : 1');
 });
