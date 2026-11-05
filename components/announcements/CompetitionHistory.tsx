@@ -230,14 +230,14 @@ function BucketRow({ stats, myScore, judge }: { stats: BucketStats; myScore?: nu
           />
         )}
       </div>
-      <div className="relative mt-0.5 h-3.5 text-[10px] text-gray-400">
-        {!(markerScore !== undefined && markerScore < 12) && <span className="absolute left-0">0</span>}
-        {!(markerScore !== undefined && markerScore > 72) && <span className="absolute right-0">84점</span>}
+      <div className="relative mt-0.5 h-3.5 text-[10px] text-gray-400" aria-hidden>
+        {!(markerScore !== undefined && markerScore < 14) && <span className="absolute left-0">0</span>}
+        {!(markerScore !== undefined && markerScore > 70) && <span className="absolute right-0">84점</span>}
         {markerScore !== undefined && (
           // 양끝에서는 라벨이 잘리지 않도록 정렬 기준을 바꾼다
           <span
             className={`absolute whitespace-nowrap font-semibold text-orange-600 ${
-              markerScore < 12 ? '' : markerScore > 72 ? '-translate-x-full' : '-translate-x-1/2'
+              markerScore < 14 ? '' : markerScore > 70 ? '-translate-x-full' : '-translate-x-1/2'
             }`}
             style={{ left: pct(markerScore) }}
           >
@@ -249,6 +249,7 @@ function BucketRow({ stats, myScore, judge }: { stats: BucketStats; myScore?: nu
         <p className="text-[11px] text-gray-500 mt-0.5">
           {judge ? '' : '참고: 민영 기준으로 보면 '}
           {chance.total}개 단지 중 {chance.passCount}곳은 내 가점({myScore}점)으로 당첨권인 주택형이 있었어요
+          {!judge && chance.level === 'unknown' && ' (표본이 적어 참고만 하세요)'}
         </p>
       )}
     </div>
