@@ -568,7 +568,13 @@ export default function AnnouncementsPage() {
 
       {selectedAnnouncement && (
         <BottomSheet isOpen={!!selectedAnnouncement} onClose={() => setSelectedAnnouncement(null)}>
-          <AnnouncementDetail key={selectedAnnouncement.id} announcement={selectedAnnouncement} scoreData={scoreData} />
+          <AnnouncementDetail
+            key={selectedAnnouncement.id}
+            announcement={selectedAnnouncement}
+            scoreData={scoreData}
+            isFavorite={favoriteIds.includes(selectedAnnouncement.id)}
+            onToggleFavorite={toggleFavorite}
+          />
         </BottomSheet>
       )}
     </main>
@@ -590,6 +596,22 @@ function StatusBadge({ status }: { status: string | undefined }) {
     <span className={`flex-shrink-0 text-xs px-2 py-0.5 rounded-full font-semibold ${cls}`}>
       {status}
     </span>
+  );
+}
+
+function FavoriteButton({ isFavorite, onToggle, size = 'sm' }: { isFavorite: boolean; onToggle: () => void; size?: 'sm' | 'md' }) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); onToggle(); }}
+      className={`leading-none transition-transform active:scale-90 ${
+        size === 'md' ? 'text-2xl px-1 -my-1' : 'text-lg'
+      } ${isFavorite ? 'text-red-500' : 'text-gray-400 hover:text-red-400'}`}
+      aria-label={isFavorite ? '즐겨찾기 해제' : '즐겨찾기 추가'}
+      aria-pressed={isFavorite}
+    >
+      {isFavorite ? '♥' : '♡'}
+    </button>
   );
 }
 
@@ -626,13 +648,7 @@ function AnnouncementCard({
                 {ddayBadge.label}
               </span>
             )}
-            <button
-              onClick={(e) => { e.stopPropagation(); onToggleFavorite(announcement); }}
-              className="text-lg leading-none transition-transform active:scale-90"
-              aria-label={isFavorite ? '즐겨찾기 해제' : '즐겨찾기 추가'}
-            >
-              {isFavorite ? '♥' : '♡'}
-            </button>
+            <FavoriteButton isFavorite={isFavorite} onToggle={() => onToggleFavorite(announcement)} />
           </div>
         </div>
 
@@ -753,7 +769,14 @@ function AddressActions({ address, size = 'sm' }: { address: string; size?: 'sm'
   );
 }
 
-function AnnouncementDetail({ announcement, scoreData }: { announcement: Announcement; scoreData: StoredScoreData | null }) {
+function AnnouncementDetail({
+  announcement, scoreData, isFavorite, onToggleFavorite,
+}: {
+  announcement: Announcement;
+  scoreData: StoredScoreData | null;
+  isFavorite: boolean;
+  onToggleFavorite: (a: Announcement) => void;
+}) {
   const [detail, setDetail] = useState<AnnouncementDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(true);
   const [detailError, setDetailError] = useState(false);
@@ -791,6 +814,7 @@ function AnnouncementDetail({ announcement, scoreData }: { announcement: Announc
               {ddayBadge.label}
             </span>
           )}
+          <FavoriteButton isFavorite={isFavorite} onToggle={() => onToggleFavorite(announcement)} size="md" />
         </div>
       </div>
       <p className="text-sm text-gray-500 mb-4">{announcement.builder} · {announcement.region}</p>
