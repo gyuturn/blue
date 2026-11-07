@@ -63,6 +63,11 @@ export default function AnnouncementMap({ region, announcements, onOpenDetail, u
   const [sdkError, setSdkError] = useState(false);
   const [coords, setCoords] = useState<CoordsState>({ status: 'loading' });
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // 핀 클릭 시 상세 팝업을 바로 연다 (#146). 핀 effect deps에 넣지 않도록 ref로 보관
+  const onOpenDetailRef = useRef(onOpenDetail);
+  useEffect(() => {
+    onOpenDetailRef.current = onOpenDetail;
+  }, [onOpenDetail]);
 
   // 좌표 조회 (지역이 바뀌면 key로 다시 마운트되므로 초기 상태가 loading)
   useEffect(() => {
@@ -159,7 +164,10 @@ export default function AnnouncementMap({ region, announcements, onOpenDetail, u
       const isSelected = announcement.id === selectedId;
       const overlay = new maps.CustomOverlay({
         position: new maps.LatLng(position.lat, position.lng),
-        content: createPin(announcement, isSelected, () => setSelectedId(announcement.id)),
+        content: createPin(announcement, isSelected, () => {
+          setSelectedId(announcement.id);
+          onOpenDetailRef.current(announcement);
+        }),
         yAnchor: 1,
         clickable: true,
         zIndex: isSelected ? 10 : 1,
@@ -191,7 +199,7 @@ export default function AnnouncementMap({ region, announcements, onOpenDetail, u
 
   return (
     <div className="space-y-3">
-      <div className="relative overflow-hidden rounded-2xl border border-gray-100 bg-gray-100 shadow-sm">
+      <div className="relative isolate overflow-hidden rounded-2xl border border-gray-100 bg-gray-100 shadow-sm">
         <div ref={containerRef} className="h-[60vh] min-h-[320px] w-full" />
         {(!map || coords.status === 'loading') && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-100/70">
@@ -249,7 +257,7 @@ export default function AnnouncementMap({ region, announcements, onOpenDetail, u
           </button>
         </div>
       ) : (
-        located.length > 0 && <p className="text-center text-xs text-gray-400">핀을 누르면 공고 정보를 볼 수 있어요</p>
+        located.length > 0 && <p className="text-center text-xs text-gray-400">핀을 누르면 공고 상세를 볼 수 있어요</p>
       )}
 
       {unlocatedCount > 0 && (
