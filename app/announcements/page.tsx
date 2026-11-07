@@ -480,6 +480,7 @@ export default function AnnouncementsPage() {
             announcements={baseAnnouncements}
             onOpenDetail={setSelectedAnnouncement}
             userPosition={userPosition}
+            centerOnUser={selectedRegion === ALL_REGION || selectedRegion === userRegion}
           />
         ) : loading ? (
           <div className="space-y-3">

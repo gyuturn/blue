@@ -14,6 +14,8 @@ interface AnnouncementMapProps {
   announcements: Announcement[];
   onOpenDetail: (announcement: Announcement) => void;
   userPosition?: UserPosition | null; // 내 위치 (#137)
+  // 첫 화면을 내 위치 중심으로 열지 여부. 다른 지역을 고르면 그 지역 핀 범위로 연다 (#145)
+  centerOnUser?: boolean;
 }
 
 const KOREA_CENTER = { lat: 36.35, lng: 127.8 };
@@ -56,7 +58,9 @@ function createPin(a: Announcement, selected: boolean, onClick: () => void): HTM
 
 type CoordsState = { status: 'loading' } | { status: 'ready'; data: Record<string, LatLng> } | { status: 'error' };
 
-export default function AnnouncementMap({ region, announcements, onOpenDetail, userPosition }: AnnouncementMapProps) {
+export default function AnnouncementMap({ region, announcements, onOpenDetail, userPosition, centerOnUser = true }: AnnouncementMapProps) {
+  // 첫 화면 중심으로 쓸 내 위치 (내 지역/전체 지역일 때만)
+  const focusPosition = centerOnUser ? userPosition ?? null : null;
   const containerRef = useRef<HTMLDivElement>(null);
   const [maps, setMaps] = useState<KakaoMapsApi | null>(null);
   const [map, setMap] = useState<KakaoMap | null>(null);
@@ -68,6 +72,16 @@ export default function AnnouncementMap({ region, announcements, onOpenDetail, u
   useEffect(() => {
     onOpenDetailRef.current = onOpenDetail;
   }, [onOpenDetail]);
+  // 지도 생성 시 최신 내 위치를 읽기 위한 ref (deps에 넣으면 지도가 다시 만들어진다) (#145)
+  const userPositionRef = useRef(focusPosition);
+  // 내 위치 중심 확대를 한 번만 하기 위한 플래그 (#145)
+  const centeredOnUserRef = useRef(false);
+  // 사용자가 지도를 직접 드래그했는지 (#145)
+  const userMovedRef = useRef(false);
+
+  useEffect(() => {
+    userPositionRef.current = focusPosition;
+  }, [focusPosition]);
 
   // 좌표 조회 (지역이 바뀌면 key로 다시 마운트되므로 초기 상태가 loading)
   useEffect(() => {
@@ -92,9 +106,13 @@ export default function AnnouncementMap({ region, announcements, onOpenDetail, u
     loadKakaoMaps()
       .then((api) => {
         if (cancelled || !containerRef.current) return;
+        // 내 위치가 있으면 처음부터 내 위치 중심으로 확대해서 연다 (#145)
+        const initial = userPositionRef.current;
         const instance = new api.Map(containerRef.current, {
-          center: new api.LatLng(KOREA_CENTER.lat, KOREA_CENTER.lng),
-          level: 13,
+          center: initial
+            ? new api.LatLng(initial.lat, initial.lng)
+            : new api.LatLng(KOREA_CENTER.lat, KOREA_CENTER.lng),
+          level: initial ? 7 : 13,
         });
         setMaps(api);
         setMap(instance);
@@ -117,16 +135,23 @@ export default function AnnouncementMap({ region, announcements, onOpenDetail, u
   const unlocatedCount = coords.status === 'ready' ? announcements.length - located.length : 0;
   const selected = located.find((p) => p.announcement.id === selectedId)?.announcement ?? null;
 
-  // 핀이 바뀌면 전체 핀이 보이게 범위 조정 (핀이 없으면 내 위치 중심)
+  // 첫 화면 범위 조정
+  // - 내 위치가 있으면: 내 위치 중심 확대(level 7)를 한 번만 하고, 이후 핀 데이터가 와도 범위를 바꾸지 않는다 (#145)
+  // - 내 위치가 없으면: 전체 핀이 보이게 범위 조정
   useEffect(() => {
     if (!maps || !map) return;
-    if (located.length === 0) {
-      if (userPosition && coords.status !== 'loading') {
-        map.setCenter(new maps.LatLng(userPosition.lat, userPosition.lng));
-        map.setLevel(8);
+    if (focusPosition) {
+      if (!centeredOnUserRef.current) {
+        centeredOnUserRef.current = true;
+        // 위치가 늦게 왔는데 사용자가 이미 지도를 움직였다면 화면을 빼앗지 않는다
+        if (userMovedRef.current) return;
+        map.setCenter(new maps.LatLng(focusPosition.lat, focusPosition.lng));
+        map.setLevel(7);
       }
       return;
     }
+    if (centeredOnUserRef.current) return;
+    if (located.length === 0) return;
     if (located.length === 1) {
       const { lat, lng } = located[0].position;
       map.setCenter(new maps.LatLng(lat, lng));
@@ -136,7 +161,7 @@ export default function AnnouncementMap({ region, announcements, onOpenDetail, u
     const bounds = new maps.LatLngBounds();
     located.forEach(({ position }) => bounds.extend(new maps.LatLng(position.lat, position.lng)));
     map.setBounds(bounds, 48, 32, 32, 32);
-  }, [maps, map, located, userPosition, coords.status]);
+  }, [maps, map, located, focusPosition]);
 
   // 내 위치 점
   useEffect(() => {
@@ -177,6 +202,16 @@ export default function AnnouncementMap({ region, announcements, onOpenDetail, u
     });
     return () => overlays.forEach((o) => o.setMap(null));
   }, [maps, map, located, selectedId]);
+
+  // 사용자가 지도를 직접 움직이면 기록한다 (#145)
+  useEffect(() => {
+    if (!maps || !map) return;
+    const markMoved = () => {
+      userMovedRef.current = true;
+    };
+    maps.event.addListener(map, 'dragstart', markMoved);
+    return () => maps.event.removeListener(map, 'dragstart', markMoved);
+  }, [maps, map]);
 
   // 지도 빈 곳을 누르면 선택 해제
   useEffect(() => {
