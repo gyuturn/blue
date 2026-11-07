@@ -190,6 +190,7 @@ export default function AnnouncementMap({ region, announcements, onOpenDetail, u
       const overlay = new maps.CustomOverlay({
         position: new maps.LatLng(position.lat, position.lng),
         content: createPin(announcement, isSelected, () => {
+          userMovedRef.current = true; // 핀을 고른 뒤에는 늦게 온 내 위치로 화면을 옮기지 않는다 (#145)
           setSelectedId(announcement.id);
           onOpenDetailRef.current(announcement);
         }),
