@@ -2,7 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildBucketStats,
+  buildSpecialResults,
+  buildSpecialStats,
   buildUnitResults,
+  defaultSupplyTab,
   formatCompetitionRate,
   getChanceSuggestions,
   judgeChance,
@@ -104,4 +107,68 @@ test('미달 중앙값은 반올림으로 1이 되지 않는다', () => {
   const u = (supply: number, requests: number): UnitResult => ({ ...unit(59, 40, supply, requests) });
   const [stats] = buildBucketStats([[u(100, 96)], [u(100, 97)], [u(100, 98)]]);
   assert.equal(stats.rateMedian, 0.9);
+});
+
+test('특별공급 신청현황을 유형별·주택형별로 합산한다', () => {
+  const rows = [
+    {
+      HOUSE_TY: '084.9800A', LFE_FRST_HSHLDCO: '4', CRSPAREA_LFE_FRST_CNT: '60', CTPRVN_LFE_FRST_CNT: '20', ETC_AREA_LFE_FRST_CNT: '8',
+      NWWDS_NMTW_HSHLDCO: 6, CRSPAREA_NWWDS_NMTW_CNT: 3, CTPRVN_NWWDS_NMTW_CNT: 0, ETC_AREA_NWWDS_NMTW_CNT: 1,
+      MNYCH_HSHLDCO: 0, CRSPAREA_MNYCH_CNT: 0,
+      INSTT_RECOMEND_HSHLDCO: 2, INSTT_RECOMEND_DCSN_CNT: 2, INSTT_RECOMEND_PREPAR_CNT: 5,
+    },
+    { HOUSE_TY: '059.9900B', LFE_FRST_HSHLDCO: '2', CRSPAREA_LFE_FRST_CNT: '1,000', CTPRVN_LFE_FRST_CNT: null, ETC_AREA_LFE_FRST_CNT: '' },
+  ];
+  const results = buildSpecialResults(rows);
+  assert.deepEqual(results.map((r) => r.type), ['firstHome', 'newlyWed', 'institution']);
+
+  const first = results[0];
+  assert.equal(first.supply, 6);
+  assert.equal(first.requests, 1088);
+  assert.equal(first.localRequests, 1060);
+  assert.equal(first.rate, 181.3);
+  assert.deepEqual(first.units.map((u) => [u.houseType, u.supply, u.requests, u.rate]), [
+    ['059.9900B', 2, 1000, 500],
+    ['084.9800A', 4, 88, 22],
+  ]);
+
+  // 신청이 배정보다 적으면 1 미만 → '미달'로 표시된다 (반올림으로 1이 되지 않음)
+  const wed = results[1];
+  assert.equal(wed.requests, 4);
+  assert.equal(wed.rate, 0.6);
+  assert.equal(formatCompetitionRate(wed.rate!), '미달');
+
+  // 기관추천은 예비자 접수를 빼고, 지역 구분이 없다
+  const inst = results[2];
+  assert.equal(inst.requests, 2);
+  assert.equal(inst.localRequests, null);
+});
+
+test('접수가 없으면 경쟁률은 null', () => {
+  const [r] = buildSpecialResults([{ HOUSE_TY: '084A', MNYCH_HSHLDCO: 3 }]);
+  assert.equal(r.type, 'multiChild');
+  assert.equal(r.rate, null);
+  assert.deepEqual(buildSpecialResults([]), []);
+});
+
+test('특별공급 지역 통계는 접수가 있는 단지의 유형별 경쟁률 중앙값', () => {
+  const mk = (supply: number, requests: number) =>
+    [{ type: 'firstHome' as const, supply, requests, localRequests: requests, rate: null, units: [] }];
+  const stats = buildSpecialStats([mk(10, 50), mk(10, 300), mk(10, 5), mk(10, 0)]);
+  assert.equal(stats.length, 1);
+  assert.equal(stats[0].type, 'firstHome');
+  assert.equal(stats[0].complexCount, 3);
+  assert.equal(stats[0].rateMedian, 5);
+  assert.equal(stats[0].rateMin, 0.5);
+  assert.equal(stats[0].rateMax, 30);
+  assert.deepEqual(buildSpecialStats([]), []);
+});
+
+test('기본 탭은 내 자격 유형 중 데이터가 있는 첫 유형', () => {
+  const none = { newlyWed: false, firstHome: false, multiChild: false };
+  assert.equal(defaultSupplyTab(['firstHome', 'newlyWed'], undefined), 'general');
+  assert.equal(defaultSupplyTab(['firstHome', 'newlyWed'], none), 'general');
+  assert.equal(defaultSupplyTab(['firstHome', 'newlyWed'], { ...none, newlyWed: true }), 'newlyWed');
+  assert.equal(defaultSupplyTab(['newlyWed'], { ...none, firstHome: true, newlyWed: true }), 'newlyWed');
+  assert.equal(defaultSupplyTab(['newlyWed'], { ...none, multiChild: true }), 'general');
 });

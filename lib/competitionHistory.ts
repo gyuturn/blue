@@ -218,3 +218,149 @@ export function getChanceSuggestions(
   }
   return suggestions;
 }
+
+// ── 특별공급 (청약홈 getAPTSpsplyReqstStus) ──────────────────────────────
+// 특별공급은 가점이 아니라 유형별 기준(소득·추첨·배점)으로 뽑으므로 경쟁률만 다룬다.
+
+export type SpecialSupplyType =
+  | 'firstHome'
+  | 'newlyWed'
+  | 'multiChild'
+  | 'newborn'
+  | 'youth'
+  | 'oldParents'
+  | 'institution';
+
+// 탭 순서. 키는 SpecialSupplyCounts와 같다.
+export const SPECIAL_SUPPLY_TYPES: SpecialSupplyType[] = [
+  'firstHome',
+  'newlyWed',
+  'multiChild',
+  'newborn',
+  'youth',
+  'oldParents',
+  'institution',
+];
+
+export const SPECIAL_SUPPLY_LABEL: Record<SpecialSupplyType, string> = {
+  firstHome: '생애최초',
+  newlyWed: '신혼부부',
+  multiChild: '다자녀',
+  newborn: '신생아',
+  youth: '청년',
+  oldParents: '노부모부양',
+  institution: '기관추천',
+};
+
+// 어떻게 뽑는지 한 줄 안내 (가점과 별개임을 알려준다)
+export const SPECIAL_SUPPLY_HOW: Record<SpecialSupplyType, string> = {
+  firstHome: '소득 기준 우선공급 후 추첨으로 뽑아요',
+  newlyWed: '소득 순위와 자녀 수 등으로 뽑고, 일부는 추첨해요',
+  multiChild: '자녀 수·무주택 기간 등 다자녀 배점표 점수 순으로 뽑아요',
+  newborn: '출산 가구 대상으로 소득 기준 우선공급 후 추첨해요',
+  youth: '청년 대상으로 소득·자산 기준을 충족하면 추첨해요',
+  oldParents: '노부모를 3년 이상 부양한 세대주를 일반공급 가점 순으로 뽑아요',
+  institution: '기관(국가유공자·장애인 등)이 대상자를 정해 추천해요 — 경쟁률은 참고만 하세요',
+};
+
+// [배정 세대수, 해당지역 접수, 기타경기 접수, 기타지역 접수]
+const SPECIAL_FIELDS: Record<SpecialSupplyType, [string, string?, string?, string?]> = {
+  firstHome: ['LFE_FRST_HSHLDCO', 'CRSPAREA_LFE_FRST_CNT', 'CTPRVN_LFE_FRST_CNT', 'ETC_AREA_LFE_FRST_CNT'],
+  newlyWed: ['NWWDS_NMTW_HSHLDCO', 'CRSPAREA_NWWDS_NMTW_CNT', 'CTPRVN_NWWDS_NMTW_CNT', 'ETC_AREA_NWWDS_NMTW_CNT'],
+  multiChild: ['MNYCH_HSHLDCO', 'CRSPAREA_MNYCH_CNT', 'CTPRVN_MNYCH_CNT', 'ETC_AREA_MNYCH_CNT'],
+  newborn: ['NWBB_NWBBSHR_HSHLDCO', 'CRSPAREA_NWBB_NWBBSHR_CNT', 'CTPRVN_NWBB_NWBBSHR_CNT', 'ETC_AREA_NWBB_NWBBSHR_CNT'],
+  youth: ['YGMN_HSHLDCO', 'CRSPAREA_YGMN_CNT', 'CTPRVN_YGMN_CNT', 'ETC_AREA_YGMN_CNT'],
+  oldParents: ['OLD_PARNTS_SUPORT_HSHLDCO', 'CRSPAREA_OPS_CNT', 'CTPRVN_OPS_CNT', 'ETC_AREA_OPS_CNT'],
+  // 기관추천은 지역 구분이 없다 (예비자 접수는 제외)
+  institution: ['INSTT_RECOMEND_HSHLDCO', undefined, undefined, 'INSTT_RECOMEND_DCSN_CNT'],
+};
+
+export interface SpecialUnit {
+  houseType: string;
+  supply: number;        // 배정 세대수
+  requests: number;      // 전체 접수 건수 (해당지역+기타경기+기타지역)
+  rate: number | null;   // 전체 접수 ÷ 배정 (접수 0이면 null)
+}
+
+export interface SpecialTypeResult {
+  type: SpecialSupplyType;
+  supply: number;
+  requests: number;
+  localRequests: number | null; // 해당지역 접수 (기관추천은 null)
+  rate: number | null;
+  units: SpecialUnit[];
+}
+
+export interface SpecialTypeStats {
+  type: SpecialSupplyType;
+  complexCount: number; // 그 유형 배정·접수가 있었던 단지 수
+  rateMedian: number;   // 단지별 경쟁률(전체 접수 ÷ 배정) 중앙값
+  rateMin: number;
+  rateMax: number;
+}
+
+const specialRate = (supply: number, requests: number) =>
+  supply > 0 && requests > 0 ? roundRate(requests / supply) : null;
+
+// 주택형 행 → 유형별 합계 + 주택형별 결과 (배정 세대가 있는 유형만)
+export function buildSpecialResults(rows: ApiRow[]): SpecialTypeResult[] {
+  const byType = groupByType(rows);
+  const houseTypes = [...byType.keys()].sort();
+
+  return SPECIAL_SUPPLY_TYPES.flatMap((type) => {
+    const [supplyKey, localKey, gyeonggiKey, etcKey] = SPECIAL_FIELDS[type];
+    let localTotal = 0;
+    const units: SpecialUnit[] = houseTypes.flatMap((houseType) => {
+      const typeRows = byType.get(houseType) ?? [];
+      const sum = (key?: string) => (key ? typeRows.reduce((acc, r) => acc + num(r[key]), 0) : 0);
+      const supply = sum(supplyKey);
+      if (supply <= 0) return [];
+      const local = sum(localKey);
+      localTotal += local;
+      const requests = local + sum(gyeonggiKey) + sum(etcKey);
+      return [{ houseType, supply, requests, rate: specialRate(supply, requests) }];
+    });
+    if (units.length === 0) return [];
+    const supply = units.reduce((acc, u) => acc + u.supply, 0);
+    const requests = units.reduce((acc, u) => acc + u.requests, 0);
+    return [{
+      type,
+      supply,
+      requests,
+      localRequests: localKey ? localTotal : null,
+      rate: specialRate(supply, requests),
+      units,
+    }];
+  });
+}
+
+// 단지별 유형 경쟁률을 모아 지역 통계를 만든다 (접수가 집계된 단지만)
+export function buildSpecialStats(complexes: SpecialTypeResult[][]): SpecialTypeStats[] {
+  return SPECIAL_SUPPLY_TYPES.flatMap((type) => {
+    const rates = complexes
+      .map((results) => results.find((r) => r.type === type))
+      .filter((r): r is SpecialTypeResult => !!r && r.supply > 0 && r.requests > 0)
+      .map((r) => r.requests / r.supply)
+      .sort((a, b) => a - b);
+    if (rates.length === 0) return [];
+    return [{
+      type,
+      complexCount: rates.length,
+      rateMedian: roundRate(median(rates)),
+      rateMin: roundRate(rates[0]),
+      rateMax: roundRate(rates[rates.length - 1]),
+    }];
+  });
+}
+
+// 처음 열릴 탭: 내 자격 유형 중 데이터가 있는 첫 유형, 없으면 일반공급
+export function defaultSupplyTab(
+  available: SpecialSupplyType[],
+  specialSupply?: SpecialSupplyEligibility,
+): SpecialSupplyType | 'general' {
+  if (!specialSupply) return 'general';
+  const mine = SPECIAL_SUPPLY_TYPES.filter(
+    (t) => (t === 'firstHome' || t === 'newlyWed' || t === 'multiChild') && specialSupply[t],
+  );
+  return mine.find((t) => available.includes(t)) ?? 'general';
+}

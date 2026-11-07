@@ -1,5 +1,12 @@
 // 청약홈 경쟁률·당첨가점 API 조회 (서버 전용)
-import { buildUnitResults, HISTORY_MONTHS, type ApiRow, type UnitResult } from '@/lib/competitionHistory';
+import {
+  buildSpecialResults,
+  buildUnitResults,
+  HISTORY_MONTHS,
+  type ApiRow,
+  type SpecialTypeResult,
+  type UnitResult,
+} from '@/lib/competitionHistory';
 import { parseUnitArea } from '@/lib/marketPrice';
 
 const CMPET_BASE = 'https://api.odcloud.kr/api/ApplyhomeInfoCmpetRtSvc/v1';
@@ -32,6 +39,12 @@ export async function fetchComplexResults(apiKey: string, houseManageNo: string)
     fetchRows(cmpetUrl(apiKey, 'getAptLttotPblancScore', houseManageNo), RESULT_REVALIDATE),
   ]);
   return buildUnitResults(competition, scores, parseUnitArea);
+}
+
+// 공고 1건의 특별공급 유형별 신청 현황 (마감 전·특공 없음이면 빈 배열)
+export async function fetchComplexSpecial(apiKey: string, houseManageNo: string): Promise<SpecialTypeResult[]> {
+  const rows = await fetchRows(cmpetUrl(apiKey, 'getAPTSpsplyReqstStus', houseManageNo), RESULT_REVALIDATE);
+  return buildSpecialResults(rows);
 }
 
 const ymd = (d: Date) => d.toISOString().slice(0, 10);
@@ -68,20 +81,30 @@ async function fetchPastAnnouncements(apiKey: string, region: string, now: Date)
 }
 
 // 지역 최근 민영 단지들의 결과. 개별 단지 조회 실패는 건너뛰고 실패 수를 함께 돌려준다.
+// 특별공급 신청현황은 일반공급과 별도로 집계한다 (특공 조회만 실패해도 일반공급 통계는 유지).
 export async function fetchRegionHistory(
   apiKey: string,
   region: string,
   now: Date,
   excludeId?: string,
-): Promise<{ complexes: UnitResult[][]; failed: number }> {
+): Promise<{ complexes: UnitResult[][]; special: SpecialTypeResult[][]; failed: number; specialFailed: number }> {
   const past = (await fetchPastAnnouncements(apiKey, region, now))
     .filter((a) => a.id !== excludeId)
     .slice(0, MAX_COMPLEXES);
-  const settled = await Promise.allSettled(past.map((a) => fetchComplexResults(apiKey, a.id)));
+  const [settled, specialSettled] = await Promise.all([
+    Promise.allSettled(past.map((a) => fetchComplexResults(apiKey, a.id))),
+    Promise.allSettled(past.map((a) => fetchComplexSpecial(apiKey, a.id))),
+  ]);
   const complexes = settled.flatMap((s) => (s.status === 'fulfilled' && s.value.length > 0 ? [s.value] : []));
+  const special = specialSettled.flatMap((s) => (s.status === 'fulfilled' && s.value.length > 0 ? [s.value] : []));
   // 모든 단지가 실패했다면 키·활용신청 문제일 가능성이 높아 오류로 알린다
   if (past.length > 0 && settled.every((s) => s.status === 'rejected')) {
     throw (settled[0] as PromiseRejectedResult).reason;
   }
-  return { complexes, failed: settled.filter((s) => s.status === 'rejected').length };
+  return {
+    complexes,
+    special,
+    failed: settled.filter((s) => s.status === 'rejected').length,
+    specialFailed: specialSettled.filter((s) => s.status === 'rejected').length,
+  };
 }
