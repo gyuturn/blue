@@ -71,6 +71,8 @@ export function useFavorites(isLoggedIn: boolean | null) {
 
       if (isFav) {
         const favId = favoriteMap[houseManageNo];
+        // 추가 요청이 아직 끝나지 않아 rowId가 없으면 무시한다 (연속 탭 시 DELETE /undefined 방지)
+        if (!favId) return;
         // optimistic remove
         setFavoriteIds((prev) => prev.filter((x) => x !== houseManageNo));
         setFavoriteMap((prev) => { const n = { ...prev }; delete n[houseManageNo]; return n; });
