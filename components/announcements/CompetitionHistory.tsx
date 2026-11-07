@@ -7,11 +7,18 @@ import type { Announcement, StoredScoreData } from '@/types';
 import {
   AREA_BUCKET_LABEL,
   CHANCE_META,
+  defaultSupplyTab,
   formatCompetitionRate,
   getChanceSuggestions,
   judgeChance,
   passedUnits,
+  SPECIAL_SUPPLY_HOW,
+  SPECIAL_SUPPLY_LABEL,
+  SPECIAL_SUPPLY_TYPES,
   type BucketStats,
+  type SpecialSupplyType,
+  type SpecialTypeResult,
+  type SpecialTypeStats,
   type UnitResult,
 } from '@/lib/competitionHistory';
 
@@ -21,7 +28,13 @@ interface HistoryData {
   complexCount: number;
   own: UnitResult[];
   stats: BucketStats[];
+  // 캐시된 이전 응답에는 없을 수 있다
+  special?: SpecialTypeResult[];
+  specialComplexCount?: number;
+  specialStats?: SpecialTypeStats[];
 }
+
+type SupplyTab = SpecialSupplyType | 'general';
 
 type HistoryState = { status: 'loading' } | { status: 'off' } | { status: 'ready'; data: HistoryData };
 
@@ -56,7 +69,8 @@ function useCompetitionHistory(houseManageNo: string, region: string): HistorySt
 const formatRate = (u: UnitResult) =>
   u.rate !== null ? formatCompetitionRate(u.rate) : u.shortfall !== null ? `미달 ${u.shortfall}세대` : '-';
 
-// 과거 당첨선으로 본 내 가능성 — 이 공고 실제 결과(마감 시) + 같은 시·도 최근 1년 민영 단지 당첨선
+// 과거 경쟁률·당첨선으로 본 내 가능성 — 공급 유형(일반공급 / 특별공급 유형별) 탭으로 나눠 보여준다.
+// 일반공급: 이 공고 실제 결과(마감 시) + 같은 시·도 최근 1년 민영 단지 당첨선 / 특별공급: 유형별 경쟁률
 export function CompetitionHistory({
   announcement,
   scoreData,
@@ -65,6 +79,7 @@ export function CompetitionHistory({
   scoreData: StoredScoreData | null;
 }) {
   const state = useCompetitionHistory(announcement.id, announcement.region);
+  const [picked, setPicked] = useState<SupplyTab | null>(null);
 
   if (state.status === 'off') return null;
   if (state.status === 'loading') {
@@ -79,23 +94,108 @@ export function CompetitionHistory({
 
   const { data } = state;
   const ownWithResult = data.own.filter((u) => u.lowest !== null || u.rate !== null || u.shortfall !== null);
-  if (ownWithResult.length === 0 && data.stats.length === 0) return null;
+  // 접수 전(배정 세대만 있는) 유형은 보여줄 경쟁률이 없어 뺀다
+  const special = (data.special ?? []).filter((r) => r.requests > 0);
+  const specialStats = data.specialStats ?? [];
+  const hasGeneral = ownWithResult.length > 0 || data.stats.length > 0;
+  const specialTypes = SPECIAL_SUPPLY_TYPES.filter(
+    // 기관추천은 지역 경쟁률을 보여주지 않으므로 이 단지 결과가 있을 때만 탭을 둔다
+    (t) => special.some((r) => r.type === t) || (t !== 'institution' && specialStats.some((r) => r.type === t)),
+  );
+  if (!hasGeneral && specialTypes.length === 0) return null;
 
+  const mySpecial = scoreData?.specialSupply;
+  const preferred = defaultSupplyTab(specialTypes, mySpecial);
+  const fallback: SupplyTab = hasGeneral || preferred !== 'general' ? preferred : specialTypes[0];
+  const tab: SupplyTab = picked && (picked === 'general' ? hasGeneral : specialTypes.includes(picked)) ? picked : fallback;
+  const tabs: SupplyTab[] = [...(hasGeneral ? (['general'] as const) : []), ...specialTypes];
+  const isMine = (t: SupplyTab) => t !== 'general' && (t === 'firstHome' || t === 'newlyWed' || t === 'multiChild') && !!mySpecial?.[t];
+
+  return (
+    <div className="rounded-xl border border-gray-100 bg-white p-4 mb-4">
+      <p className="text-xs font-bold text-gray-800">
+        과거 경쟁률·당첨선으로 본 내 가능성{' '}
+        <Tooltip
+          term="공급 유형별 경쟁률"
+          definition="청약은 일반공급과 특별공급(생애최초·신혼부부 등)을 따로 뽑아서 경쟁률도 따로예요. 탭을 눌러 유형별로 확인하세요. 일반공급 경쟁률은 1순위 해당지역 신청자 수 ÷ 공급 세대수, 특별공급 경쟁률은 전체 접수 건수 ÷ 배정 세대수예요. 최저 당첨가점은 일반공급 가점제로 당첨된 사람 중 가장 낮은 점수예요."
+        >
+          <span className="text-blue-400 font-normal">ⓘ</span>
+        </Tooltip>
+      </p>
+
+      {tabs.length > 1 && (
+        <div className="mt-2.5 -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" role="tablist" aria-label="공급 유형">
+          {tabs.map((t) => {
+            const active = t === tab;
+            return (
+              <button
+                key={t}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setPicked(t)}
+                className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-semibold transition-colors ${
+                  active
+                    ? 'bg-gray-900 text-white'
+                    : isMine(t)
+                      ? 'bg-purple-50 text-purple-700'
+                      : 'bg-gray-50 text-gray-600 border border-gray-200'
+                }`}
+              >
+                {isMine(t) && '✓ '}
+                {t === 'general' ? '일반공급' : SPECIAL_SUPPLY_LABEL[t]}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {tab === 'general' ? (
+        <GeneralPanel
+          data={data}
+          ownWithResult={ownWithResult}
+          announcement={announcement}
+          scoreData={scoreData}
+        />
+      ) : (
+        <SpecialPanel
+          type={tab}
+          own={special.find((r) => r.type === tab)}
+          stats={specialStats.find((r) => r.type === tab)}
+          region={data.region}
+          months={data.months}
+          mine={isMine(tab)}
+        />
+      )}
+
+      <p className="mt-2 text-[10px] text-gray-400 leading-snug">
+        청약홈 공개 결과로 추정한 참고용 정보예요. 입지·분양가·추첨 물량에 따라 실제 결과는 달라질 수 있어요.
+      </p>
+    </div>
+  );
+}
+
+// 일반공급 탭 — 1순위 경쟁률 + 가점제 당첨선 + 내 가점 판정
+function GeneralPanel({
+  data,
+  ownWithResult,
+  announcement,
+  scoreData,
+}: {
+  data: HistoryData;
+  ownWithResult: UnitResult[];
+  announcement: Announcement;
+  scoreData: StoredScoreData | null;
+}) {
   const myScore = scoreData?.result.totalScore;
   const isPublic = announcement.supplyKind === '국민';
   const judgeable = myScore !== undefined && !isPublic;
   const suggestions = judgeable ? getChanceSuggestions(myScore, data.stats, scoreData?.specialSupply) : [];
 
   return (
-    <div className="rounded-xl border border-gray-100 bg-white p-4 mb-4">
-      <p className="text-xs font-bold text-gray-800">
-        과거 당첨선으로 본 내 가능성{' '}
-        <Tooltip
-          term="최저 당첨가점"
-          definition="가점제로 당첨된 사람 중 가장 낮은 점수예요. 내 가점이 이 점수 이상이면 그 주택형에서 당첨권이었다는 뜻이에요. 면적대별 통계는 단지마다 당첨선이 가장 낮았던 주택형 기준이에요. 경쟁률은 1순위 해당지역 신청자 수 ÷ 공급 세대수이고, 미달은 1순위 해당지역 신청자가 공급 세대보다 적었다는 뜻이에요(기타지역·2순위에서 채워졌을 수 있어요)."
-        >
-          <span className="text-blue-400 font-normal">ⓘ</span>
-        </Tooltip>
+    <>
+      <p className="mt-2 text-[11px] text-gray-500">
+        <span className="font-semibold text-gray-700">일반공급</span> · 경쟁률은 1순위 해당지역, 당첨선은 가점제 기준이에요
       </p>
 
       {isPublic && (
@@ -117,7 +217,7 @@ export function CompetitionHistory({
                 >
                   <span className="font-semibold text-gray-800">{u.houseType}</span>
                   <span className="ml-2">
-                    경쟁률{' '}
+                    1순위 경쟁률{' '}
                     <span className={(u.rate !== null && u.rate < 1) || u.shortfall !== null ? 'font-semibold text-green-600' : undefined}>
                       {formatRate(u)}
                     </span>
@@ -181,11 +281,97 @@ export function CompetitionHistory({
           </ul>
         </div>
       )}
+    </>
+  );
+}
 
-      <p className="mt-2 text-[10px] text-gray-400 leading-snug">
-        청약홈 공개 결과로 추정한 참고용 정보예요. 입지·분양가·추첨 물량에 따라 실제 당첨선은 달라질 수 있어요.
+const rateClass = (rate: number | null) => (rate !== null && rate < 1 ? 'font-semibold text-green-600' : 'font-semibold text-gray-800');
+const rateText = (rate: number | null) => (rate !== null ? formatCompetitionRate(rate) : '접수 없음');
+
+// 특별공급 탭 — 가점과 별개라 막대 없이 유형별 경쟁률만
+function SpecialPanel({
+  type,
+  own,
+  stats,
+  region,
+  months,
+  mine,
+}: {
+  type: SpecialSupplyType;
+  own?: SpecialTypeResult;
+  stats?: SpecialTypeStats;
+  region: string;
+  months: number;
+  mine: boolean;
+}) {
+  const label = SPECIAL_SUPPLY_LABEL[type];
+  // 기관추천은 기관이 대상자를 정해 추천하는 방식이라 경쟁률 대신 세대·추천 건수만 보여준다
+  const showRate = type !== 'institution';
+  return (
+    <>
+      <p className="mt-2 text-[11px] text-gray-500">
+        <span className="font-semibold text-gray-700">{label} 특별공급</span> · 가점과 별개로 뽑아요. {SPECIAL_SUPPLY_HOW[type]}
       </p>
-    </div>
+      {mine && <p className="mt-1 text-[11px] font-semibold text-purple-700">✓ 내가 입력한 정보로는 자격 가능성이 있는 유형이에요 (소득·자산 기준은 공고에서 확인하세요)</p>}
+
+      {own && (
+        <div className="mt-3">
+          <p className="text-[11px] font-semibold text-gray-500 mb-1.5">이 단지 실제 결과</p>
+          <div className="rounded-lg bg-gray-50 px-2.5 py-2 text-[11px] text-gray-600">
+            <p>
+              {label} {own.supply.toLocaleString()}세대 · {own.requests.toLocaleString()}건 {showRate ? '접수' : '추천'}
+              {own.localRequests !== null && own.localRequests > 0 && (
+                <span className="text-gray-400"> (해당지역 {own.localRequests.toLocaleString()}건)</span>
+              )}
+            </p>
+            {showRate && (
+              <p className="mt-0.5">
+                경쟁률 <span className={rateClass(own.rate)}>{rateText(own.rate)}</span>
+              </p>
+            )}
+          </div>
+          {own.units.length > 1 && (
+            <div className="mt-1.5 space-y-1">
+              {own.units.map((u) => (
+                <div key={u.houseType} className="flex justify-between gap-2 px-2.5 text-[11px] text-gray-600">
+                  <span className="font-semibold text-gray-800">{u.houseType}</span>
+                  <span>
+                    {u.supply}세대 · {u.requests.toLocaleString()}건
+                    {showRate && (
+                      <>
+                        {' · '}
+                        <span className={rateClass(u.rate)}>{rateText(u.rate)}</span>
+                      </>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {stats && showRate && (
+        <div className="mt-3">
+          <p className="text-[11px] text-gray-500 mb-1.5">
+            최근 {months}개월 {region} 민영 {stats.complexCount}개 단지 {label} 경쟁률
+          </p>
+          <div className="rounded-lg border border-gray-100 px-2.5 py-2 text-[11px] text-gray-600">
+            중앙값 <span className={rateClass(stats.rateMedian)}>{formatCompetitionRate(stats.rateMedian)}</span>
+            <span className="text-gray-400">
+              {' '}
+              (낮게는 {formatCompetitionRate(stats.rateMin)} ~ 높게는 {formatCompetitionRate(stats.rateMax)})
+            </span>
+          </div>
+        </div>
+      )}
+
+      {showRate && (
+        <p className="mt-2 text-[10px] text-gray-400 leading-snug">
+          특별공급 경쟁률 = 전체 접수 건수(해당지역·기타지역 합) ÷ 배정 세대수예요. 해당지역 거주자가 먼저 뽑혀요.
+        </p>
+      )}
+    </>
   );
 }
 
@@ -209,7 +395,7 @@ function BucketRow({ stats, myScore, judge }: { stats: BucketStats; myScore?: nu
         최저 당첨가점 {stats.lowestMedian}점 ({stats.lowestMin}~{stats.lowestMax})
         {stats.rateMedian !== null && (
           <>
-            {' · 경쟁률 '}
+            {' · 1순위 경쟁률 '}
             <span className={stats.rateMedian < 1 ? 'font-semibold text-green-600' : undefined}>
               {formatCompetitionRate(stats.rateMedian)}
             </span>

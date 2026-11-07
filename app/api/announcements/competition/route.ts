@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { REGION_MAP, resolveRegionParam } from '@/lib/announcements';
-import { fetchComplexResults, fetchRegionHistory } from '@/lib/competitionApi';
-import { buildBucketStats, HISTORY_MONTHS } from '@/lib/competitionHistory';
+import { fetchComplexResults, fetchComplexSpecial, fetchRegionHistory } from '@/lib/competitionApi';
+import { buildBucketStats, buildSpecialStats, HISTORY_MONTHS } from '@/lib/competitionHistory';
 
 export const maxDuration = 30;
 
@@ -24,8 +24,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ enabled: false, reason: 'no-key' }, { headers: { 'Cache-Control': SHORT_CACHE } });
   }
 
-  const [own, history] = await Promise.allSettled([
+  const [own, ownSpecial, history] = await Promise.allSettled([
     fetchComplexResults(apiKey, houseManageNo),
+    // 특별공급 신청현황은 별도 오퍼레이션 — 실패해도 일반공급 결과는 그대로 보여준다
+    fetchComplexSpecial(apiKey, houseManageNo),
     fetchRegionHistory(apiKey, region, new Date(), houseManageNo),
   ]);
   if (own.status === 'rejected' && history.status === 'rejected') {
@@ -35,8 +37,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ enabled: false, reason }, { headers: { 'Cache-Control': SHORT_CACHE } });
   }
 
+  if (ownSpecial.status === 'rejected') console.error('[competition] special error:', ownSpecial.reason);
   const complexes = history.status === 'fulfilled' ? history.value.complexes : [];
-  // 일부라도 실패했다면 표본이 줄어든 통계라 짧게만 캐시
+  const specialComplexes = history.status === 'fulfilled' ? history.value.special : [];
+  // 일반공급 조회가 일부라도 실패했다면 표본이 줄어든 통계라 짧게만 캐시.
+  // 특공 조회 실패는 캐시 판단에서 뺀다 — 특공 API만 계속 실패할 때 매번 5분 캐시로 호출이 몰리지 않도록.
   const complete = own.status === 'fulfilled' && history.status === 'fulfilled' && history.value.failed === 0;
   return NextResponse.json(
     {
@@ -46,6 +51,9 @@ export async function GET(request: Request) {
       complexCount: complexes.length,
       own: own.status === 'fulfilled' ? own.value : [],
       stats: buildBucketStats(complexes),
+      special: ownSpecial.status === 'fulfilled' ? ownSpecial.value : [],
+      specialComplexCount: specialComplexes.length,
+      specialStats: buildSpecialStats(specialComplexes),
     },
     { headers: { 'Cache-Control': complete ? OK_CACHE : SHORT_CACHE } },
   );
