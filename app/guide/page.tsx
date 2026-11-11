@@ -5,7 +5,7 @@ import GuideAccordion from '@/components/GuideAccordion';
 import type { FAQItem } from '@/components/GuideAccordion';
 
 export const metadata: Metadata = {
-  title: '청약 완전 정복 가이드 | 청약 매칭 가이드',
+  title: '청약 완전 정복 가이드',
   description: '청약 입문자를 위한 쉬운 청약 개념 정리와 절차 안내',
 };
 
@@ -55,7 +55,7 @@ export default function GuidePage() {
         </div>
         <div className="relative max-w-3xl mx-auto px-4 py-16 text-center">
           <p className="text-blue-50 text-sm font-medium mb-3">
-            청약 매칭 가이드
+            청약 메이트
           </p>
           <h1 className="text-3xl md:text-4xl font-black mb-4">
             청약, 처음이세요?

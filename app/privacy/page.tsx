@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: '개인정보 처리방침 | 청약 매칭 가이드',
+  title: '개인정보 처리방침',
 };
 
 export default function PrivacyPage() {
@@ -25,7 +25,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-base font-bold text-gray-900 mb-3">1. 개요</h2>
             <p>
-              청약 매칭 가이드(이하 &quot;서비스&quot;)는 이용자의 개인정보를 소중히 여기며,
+              청약 메이트(이하 &quot;서비스&quot;)는 이용자의 개인정보를 소중히 여기며,
               「개인정보 보호법」 등 관련 법령을 준수합니다. 본 처리방침은 서비스가
               수집하는 개인정보의 항목, 수집 목적, 보유 기간 및 이용자의 권리에 대해
               안내합니다.

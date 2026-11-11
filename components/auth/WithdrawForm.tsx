@@ -51,7 +51,7 @@ export default function WithdrawForm({ nickname }: { nickname: string }) {
       clearDeviceData();
       alert(
         body.kakaoUnlinked === false
-          ? '탈퇴가 완료됐어요. 저장된 정보는 모두 삭제했어요.\n\n다만 카카오 계정 연결은 끊지 못했어요. 카카오톡 > 설정 > 카카오계정 > 연결된 서비스 관리에서 "청약블루"를 직접 연결 끊기 해 주세요.'
+          ? '탈퇴가 완료됐어요. 저장된 정보는 모두 삭제했어요.\n\n다만 카카오 계정 연결은 끊지 못했어요. 카카오톡 > 설정 > 카카오계정 > 연결된 서비스 관리에서 "청약 메이트"를 직접 연결 끊기 해 주세요.'
           : '탈퇴가 완료됐어요. 그동안 이용해 주셔서 감사합니다.',
       );
       window.location.href = '/';

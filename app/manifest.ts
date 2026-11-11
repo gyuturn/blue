@@ -3,8 +3,8 @@ import type { MetadataRoute } from 'next';
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: '/',
-    name: '청약 매칭 가이드',
-    short_name: '청약 가이드',
+    name: '청약 메이트',
+    short_name: '청약 메이트',
     description: '복잡한 청약 가점을 자동으로 계산하고, 내 상황에 맞는 청약 공고를 추천해 드립니다.',
     start_url: '/',
     scope: '/',
