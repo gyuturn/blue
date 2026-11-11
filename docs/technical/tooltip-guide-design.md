@@ -127,7 +127,7 @@ This is a **Server Component** (no `'use client'`). Static content; no need for 
 
 ```
 export const metadata: Metadata = {
-  title: '청약 완전 정복 가이드 | 청약 매칭 가이드',
+  title: '청약 완전 정복 가이드',
   description: '청약 입문자를 위한 쉬운 청약 개념 정리',
 };
 ```

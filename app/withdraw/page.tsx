@@ -4,7 +4,7 @@ import { getSession } from '@/lib/auth/session';
 import WithdrawForm from '@/components/auth/WithdrawForm';
 
 export const metadata: Metadata = {
-  title: '회원탈퇴 | 청약블루',
+  title: '회원탈퇴',
   robots: { index: false },
 };
 

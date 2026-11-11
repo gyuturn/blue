@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: '이용약관 | 청약 매칭 가이드',
+  title: '이용약관',
 };
 
 export default function TermsPage() {
@@ -25,7 +25,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-base font-bold text-gray-900 mb-3">제1조 (목적)</h2>
             <p>
-              본 약관은 청약 매칭 가이드(이하 &quot;서비스&quot;)의 이용 조건 및 절차,
+              본 약관은 청약 메이트(이하 &quot;서비스&quot;)의 이용 조건 및 절차,
               이용자와 서비스 제공자의 권리·의무에 관한 사항을 규정합니다.
             </p>
           </section>

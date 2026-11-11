@@ -9,8 +9,8 @@ export default async function Header() {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-gray-200 bg-white/80 backdrop-blur-sm">
       <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-2 px-4 sm:gap-4">
-        <Link href="/" className="shrink-0 whitespace-nowrap text-lg font-bold text-blue-600">
-          청약블루
+        <Link href="/" className="shrink-0 whitespace-nowrap text-base font-bold text-blue-600 sm:text-lg">
+          청약 메이트
         </Link>
 
         <nav className="flex items-center gap-3 whitespace-nowrap sm:gap-6">

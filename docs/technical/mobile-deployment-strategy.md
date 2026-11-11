@@ -106,7 +106,7 @@ Next.js Build (output: export) → out/ 폴더
 ### Phase 3: Capacitor 통합 (1주)
 ```bash
 npm install @capacitor/core @capacitor/cli
-npx cap init "청약매칭가이드" "com.blue.cheongyak"
+npx cap init "청약 메이트" "com.blue.cheongyak"
 npm install @capacitor/ios @capacitor/android
 npx cap add ios
 npx cap add android

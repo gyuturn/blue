@@ -9,15 +9,15 @@ import { LAST_SCORE_KEY } from "@/lib/scoreStorage";
 
 export const metadata: Metadata = {
   title: {
-    default: '청약 매칭 가이드',
-    template: '%s | 청약 매칭 가이드',
+    default: '청약 메이트',
+    template: '%s | 청약 메이트',
   },
   description: '복잡한 청약 가점을 자동으로 계산하고, 내 상황에 맞는 청약 공고를 추천해 드립니다.',
   keywords: ['청약', '청약 가점', '청약 계산기', '특별공급', '청약 공고', '무주택'],
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: '청약 가이드',
+    title: '청약 메이트',
     startupImage: '/apple-touch-icon.png',
   },
   formatDetection: {

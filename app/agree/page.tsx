@@ -44,7 +44,7 @@ export default function AgreePage() {
             </svg>
           </div>
           <h1 className="text-xl font-bold text-gray-900">서비스 이용 동의</h1>
-          <p className="text-sm text-gray-500 mt-1">청약 매칭 가이드를 이용하시려면<br />아래 약관에 동의해 주세요.</p>
+          <p className="text-sm text-gray-500 mt-1">청약 메이트를 이용하시려면<br />아래 약관에 동의해 주세요.</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-4">
