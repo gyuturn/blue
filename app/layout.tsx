@@ -6,8 +6,10 @@ import Header from "@/components/layout/Header";
 import ServiceWorkerRegister from "@/components/layout/ServiceWorkerRegister";
 import { deviceScoreRedirectScript } from "@/lib/home";
 import { LAST_SCORE_KEY } from "@/lib/scoreStorage";
+import { SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: {
     default: '청약 메이트',
     template: '%s | 청약 메이트',

@@ -21,4 +21,6 @@
 
 ## 바꾸지 않는 것
 
-도메인(`blue-snowy.vercel.app`), 안드로이드 패키지명(`com.blue.cheongyak`), 저장소 이름, `blue-*` 색상 토큰은 내부 식별자라서 그대로 둔다.
+안드로이드 패키지명(`com.blue.cheongyak`), 저장소 이름, `blue-*` 색상 토큰은 내부 식별자라서 그대로 둔다.
+
+서비스 도메인은 `cheongyak.kro.kr`이다. 코드에서는 `lib/site.ts`의 `SITE_URL`(환경변수 `NEXT_PUBLIC_SITE_URL`, 기본값 `https://cheongyak.kro.kr`)만 쓰고 주소를 직접 적지 않는다.

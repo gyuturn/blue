@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://blue-snowy.vercel.app/sitemap.xml
